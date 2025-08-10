@@ -29,7 +29,7 @@ class Rescue {
         json['location']['latitude'] as double,
         json['location']['longitude'] as double,
       ),
-      altitude: json['altitude'] as double?,
+      altitude: ((json['altitude'] ?? 0) as int).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
       createdBy: json['createdBy'] as String,
       isActive: json['isActive'] as bool? ?? true,

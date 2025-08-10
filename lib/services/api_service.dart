@@ -42,8 +42,11 @@ class ApiService {
   /// 获取救援信息
   static Future<Rescue?> getRescue(String rescueId) async {
     try {
+      final url = Uri.parse(
+          '$baseUrl$documentsEndpoint?collection=rescue_$rescueId&document=rescue_info');
+      print('获取救援信息URL: $url');
       final response = await http.get(
-        Uri.parse('$baseUrl$documentsEndpoint?collection=rescue_$rescueId&document=rescue_info'),
+        url,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -51,9 +54,11 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          final rescueData = data['data']['data']['rescue_info'];
-          return Rescue.fromJson(rescueData);
+        final success = data['success'];
+        final info = data['data']['data']['rescue_info'];
+        print("获取救援信息响应, $success, $info");
+        if (success == true && info != null) {
+          return Rescue.fromJson(info);
         }
       }
       return null;
@@ -101,17 +106,18 @@ class ApiService {
   }
 
   /// 上传位置点（批量）
-  static Future<bool> uploadLocationPoints(String rescueId, String userId, List<LocationPoint> points) async {
+  static Future<bool> uploadLocationPoints(
+      String rescueId, String userId, List<LocationPoint> points) async {
     if (points.isEmpty) return true;
 
     try {
       // 将位置点按时间分组，避免单个文档过大
       final batches = _batchLocationPoints(points, 100); // 每批100个点
-      
+
       for (int i = 0; i < batches.length; i++) {
         final batch = batches[i];
         final batchId = '${DateTime.now().millisecondsSinceEpoch}_$i';
-        
+
         final response = await http.post(
           Uri.parse('$baseUrl$documentsEndpoint'),
           headers: {
@@ -135,7 +141,7 @@ class ApiService {
           return false;
         }
       }
-      
+
       return true;
     } catch (e) {
       print('上传位置点失败: $e');
@@ -147,7 +153,8 @@ class ApiService {
   static Future<List<Track>> getRescueTracks(String rescueId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl$documentsEndpoint?collection=rescue_$rescueId&limit=100'),
+        Uri.parse(
+            '$baseUrl$documentsEndpoint?collection=rescue_$rescueId&limit=100'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -158,7 +165,7 @@ class ApiService {
         if (data['success'] == true && data['data'] != null) {
           final documents = data['data']['documents'] as List<dynamic>;
           final tracks = <Track>[];
-          
+
           for (final doc in documents) {
             final docData = doc['data'];
             if (docData['type'] == 'track') {
@@ -170,7 +177,7 @@ class ApiService {
               }
             }
           }
-          
+
           return tracks;
         }
       }
@@ -182,10 +189,12 @@ class ApiService {
   }
 
   /// 获取用户的位置点
-  static Future<List<LocationPoint>> getUserLocationPoints(String rescueId, String userId) async {
+  static Future<List<LocationPoint>> getUserLocationPoints(
+      String rescueId, String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl$documentsEndpoint?collection=rescue_$rescueId&limit=100'),
+        Uri.parse(
+            '$baseUrl$documentsEndpoint?collection=rescue_$rescueId&limit=100'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -196,10 +205,11 @@ class ApiService {
         if (data['success'] == true && data['data'] != null) {
           final documents = data['data']['documents'] as List<dynamic>;
           final allPoints = <LocationPoint>[];
-          
+
           for (final doc in documents) {
             final docData = doc['data'];
-            if (docData['type'] == 'location_points' && docData['userId'] == userId) {
+            if (docData['type'] == 'location_points' &&
+                docData['userId'] == userId) {
               try {
                 final points = docData['points'] as List<dynamic>;
                 for (final pointData in points) {
@@ -211,7 +221,7 @@ class ApiService {
               }
             }
           }
-          
+
           // 按时间排序
           allPoints.sort((a, b) => a.timestamp.compareTo(b.timestamp));
           return allPoints;
@@ -225,10 +235,12 @@ class ApiService {
   }
 
   /// 将位置点分批
-  static List<List<LocationPoint>> _batchLocationPoints(List<LocationPoint> points, int batchSize) {
+  static List<List<LocationPoint>> _batchLocationPoints(
+      List<LocationPoint> points, int batchSize) {
     final batches = <List<LocationPoint>>[];
     for (int i = 0; i < points.length; i += batchSize) {
-      final end = (i + batchSize < points.length) ? i + batchSize : points.length;
+      final end =
+          (i + batchSize < points.length) ? i + batchSize : points.length;
       batches.add(points.sublist(i, end));
     }
     return batches;
