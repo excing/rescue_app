@@ -1,0 +1,490 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import '../services/location_service.dart';
+import '../services/api_service.dart';
+import '../services/storage_service.dart';
+import '../services/sync_service.dart';
+import '../models/rescue.dart';
+import '../models/track.dart';
+import '../models/location_point.dart';
+import 'map_screen.dart';
+
+/// 救援页面 - 主要功能页面
+class RescueScreen extends StatefulWidget {
+  final String rescueId;
+
+  const RescueScreen({
+    super.key,
+    required this.rescueId,
+  });
+
+  @override
+  State<RescueScreen> createState() => _RescueScreenState();
+}
+
+class _RescueScreenState extends State<RescueScreen> {
+  final LocationService _locationService = LocationService();
+  final StorageService _storageService = StorageService();
+  final SyncService _syncService = SyncService();
+
+  Rescue? _rescue;
+  List<Track> _tracks = [];
+  bool _isLoading = true;
+  bool _isTracking = false;
+  String _userId = '';
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeRescue();
+  }
+
+  @override
+  void dispose() {
+    if (_isTracking) {
+      _locationService.stopTracking();
+    }
+    _syncService.stop();
+    super.dispose();
+  }
+
+  /// 初始化救援信息
+  Future<void> _initializeRescue() async {
+    try {
+      // 生成用户ID和名称
+      _userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      _userName = '救援员${DateTime.now().millisecondsSinceEpoch % 1000}';
+
+      // 获取救援信息
+      _rescue = await ApiService.getRescue(widget.rescueId);
+      _rescue ??= await _storageService.getRescue(widget.rescueId);
+
+      if (_rescue == null) {
+        _showToast('救援信息不存在');
+        if (mounted) {
+          Navigator.pop(context);
+        }
+        return;
+      }
+
+      // 获取轨迹信息
+      await _loadTracks();
+
+      // 初始化同步服务
+      await _syncService.initialize(widget.rescueId, _userId);
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('初始化救援失败: $e');
+      _showToast('加载救援信息失败');
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  /// 加载轨迹信息
+  Future<void> _loadTracks() async {
+    try {
+      final tracks = await ApiService.getRescueTracks(widget.rescueId);
+      setState(() {
+        _tracks = tracks;
+      });
+    } catch (e) {
+      print('加载轨迹失败: $e');
+    }
+  }
+
+  /// 开始/停止轨迹记录
+  Future<void> _toggleTracking() async {
+    if (_isTracking) {
+      // 停止轨迹记录
+      await _locationService.stopTracking();
+      setState(() {
+        _isTracking = false;
+      });
+      _showToast('轨迹记录已停止');
+    } else {
+      // 开始轨迹记录
+      final success =
+          await _locationService.startTracking(widget.rescueId, _userId);
+      if (success) {
+        setState(() {
+          _isTracking = true;
+        });
+        _showToast('轨迹记录已开始');
+
+        // 监听位置更新
+        _locationService.locationStream.listen((locationPoint) {
+          _onLocationUpdate(locationPoint);
+        });
+      } else {
+        _showToast('无法开始轨迹记录，请检查位置权限');
+      }
+    }
+  }
+
+  /// 位置更新回调
+  void _onLocationUpdate(LocationPoint point) {
+    // 保存到本地
+    _storageService.saveLocationPoint(point);
+
+    // 同步服务会自动处理上传
+  }
+
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('救援 ${widget.rescueId}'),
+        backgroundColor: Colors.blue[600],
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _loadTracks,
+            icon: const Icon(Icons.refresh),
+            tooltip: '刷新',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : Column(
+              children: [
+                // 救援信息卡片
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.emergency,
+                            color: Colors.red[600],
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '救援信息',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _rescue?.description ?? '无描述',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_rescue?.location != null) ...[
+                        Text(
+                          '位置: ${_rescue!.location.latitude.toStringAsFixed(6)}, ${_rescue!.location.longitude.toStringAsFixed(6)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        if (_rescue!.altitude != null)
+                          Text(
+                            '海拔: ${_rescue!.altitude!.toStringAsFixed(1)}m',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // 当前位置信息
+                Consumer<LocationService>(
+                  builder: (context, locationService, child) {
+                    final position = locationService.currentPosition;
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.green[200]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.my_location,
+                                color: Colors.green[600],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '当前位置',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green[800],
+                                ),
+                              ),
+                              const Spacer(),
+                              if (locationService.isAccuracyGood())
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green[600],
+                                  size: 16,
+                                )
+                              else
+                                Icon(
+                                  Icons.warning,
+                                  color: Colors.orange[600],
+                                  size: 16,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (position != null) ...[
+                            Text(
+                              '纬度: ${position.latitude.toStringAsFixed(6)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            Text(
+                              '经度: ${position.longitude.toStringAsFixed(6)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            Text(
+                              '精度: ${position.accuracy.toStringAsFixed(1)}m',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            if (position.altitude != 0)
+                              Text(
+                                '海拔: ${position.altitude.toStringAsFixed(1)}m',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                          ] else
+                            Text(
+                              '正在获取位置...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // 轨迹统计
+                Consumer<LocationService>(
+                  builder: (context, locationService, child) {
+                    final trackPoints = locationService.trackPoints;
+                    final totalDistance = locationService.getTotalDistance();
+                    final averageSpeed = locationService.getAverageSpeed();
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.blue[200]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.timeline,
+                                color: Colors.blue[600],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '轨迹统计',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '记录点数: ${trackPoints.length}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                    Text(
+                                      '总距离: ${(totalDistance / 1000).toStringAsFixed(2)}km',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '平均速度: ${(averageSpeed * 3.6).toStringAsFixed(1)}km/h',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                    Text(
+                                      '状态: ${_isTracking ? "记录中" : "已停止"}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: _isTracking
+                                            ? Colors.green[700]
+                                            : Colors.grey[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+                const Spacer(),
+
+                // 控制按钮
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _toggleTracking,
+                          icon:
+                              Icon(_isTracking ? Icons.stop : Icons.play_arrow),
+                          label: Text(_isTracking ? '停止记录' : '开始记录'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isTracking
+                                ? Colors.red[600]
+                                : Colors.green[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MapScreen(
+                                rescueId: widget.rescueId,
+                                rescue: _rescue,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.map),
+                        label: const Text('地图'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[600],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 24,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
