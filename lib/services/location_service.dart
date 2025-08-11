@@ -18,9 +18,10 @@ class LocationService extends ChangeNotifier {
   bool _hasPermission = false;
   String? _currentRescueId;
   String? _currentUserId;
-  
+
   final List<LocationPoint> _trackPoints = [];
-  final StreamController<LocationPoint> _locationController = StreamController<LocationPoint>.broadcast();
+  final StreamController<LocationPoint> _locationController =
+      StreamController<LocationPoint>.broadcast();
 
   // Getters
   Position? get currentPosition => _currentPosition;
@@ -32,11 +33,18 @@ class LocationService extends ChangeNotifier {
   /// 初始化位置服务
   Future<bool> initialize() async {
     try {
+      print('开始初始化位置服务...');
+
       // 检查位置服务是否启用
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('位置服务未启用');
-        return false;
+        print('位置服务未启用，尝试打开设置');
+        // 尝试打开位置设置
+        serviceEnabled = await Geolocator.openLocationSettings();
+        if (!serviceEnabled) {
+          print('用户未开启位置服务');
+          return false;
+        }
       }
 
       // 请求位置权限
@@ -47,10 +55,14 @@ class LocationService extends ChangeNotifier {
       }
 
       _hasPermission = true;
-      
+      print('位置权限获取成功');
+
       // 获取当前位置
-      await getCurrentLocation();
-      
+      final position = await getCurrentLocation();
+      if (position != null) {
+        print('当前位置获取成功: ${position.latitude}, ${position.longitude}');
+      }
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -64,14 +76,14 @@ class LocationService extends ChangeNotifier {
     try {
       // 检查当前权限状态
       LocationPermission permission = await Geolocator.checkPermission();
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           return false;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         // 权限被永久拒绝，需要用户手动开启
         return false;
@@ -97,19 +109,40 @@ class LocationService extends ChangeNotifier {
   Future<Position?> getCurrentLocation() async {
     try {
       if (!_hasPermission) {
-        await initialize();
+        print('没有位置权限，尝试重新初始化...');
+        final initialized = await initialize();
+        if (!initialized) {
+          print('重新初始化失败');
+          return null;
+        }
       }
 
+      print('开始获取当前位置...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 15),
       );
 
       _currentPosition = position;
+      print(
+          '位置获取成功: ${position.latitude}, ${position.longitude}, 精度: ${position.accuracy}m');
       notifyListeners();
       return position;
     } catch (e) {
       print('获取当前位置失败: $e');
+      // 尝试使用最后已知位置
+      try {
+        final lastPosition = await Geolocator.getLastKnownPosition();
+        if (lastPosition != null) {
+          print(
+              '使用最后已知位置: ${lastPosition.latitude}, ${lastPosition.longitude}');
+          _currentPosition = lastPosition;
+          notifyListeners();
+          return lastPosition;
+        }
+      } catch (e2) {
+        print('获取最后已知位置也失败: $e2');
+      }
       return null;
     }
   }
@@ -168,7 +201,7 @@ class LocationService extends ChangeNotifier {
       _positionStream = null;
       _currentRescueId = null;
       _currentUserId = null;
-      
+
       notifyListeners();
       print('停止轨迹记录');
     } catch (e) {
@@ -195,8 +228,9 @@ class LocationService extends ChangeNotifier {
 
         _trackPoints.add(locationPoint);
         _locationController.add(locationPoint);
-        
-        print('位置更新: ${position.latitude}, ${position.longitude}, 精度: ${position.accuracy}m');
+
+        print(
+            '位置更新: ${position.latitude}, ${position.longitude}, 精度: ${position.accuracy}m');
       }
 
       notifyListeners();
@@ -234,7 +268,7 @@ class LocationService extends ChangeNotifier {
   /// 计算总距离
   double getTotalDistance() {
     if (_trackPoints.length < 2) return 0.0;
-    
+
     double total = 0.0;
     for (int i = 1; i < _trackPoints.length; i++) {
       total += _trackPoints[i - 1].distanceTo(_trackPoints[i]);
@@ -245,10 +279,11 @@ class LocationService extends ChangeNotifier {
   /// 计算平均速度
   double getAverageSpeed() {
     if (_trackPoints.length < 2) return 0.0;
-    
+
     final totalDistance = getTotalDistance();
-    final totalTime = _trackPoints.last.timestamp.difference(_trackPoints.first.timestamp);
-    
+    final totalTime =
+        _trackPoints.last.timestamp.difference(_trackPoints.first.timestamp);
+
     if (totalTime.inSeconds > 0) {
       return totalDistance / totalTime.inSeconds; // 米/秒
     }

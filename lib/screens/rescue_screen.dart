@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -5,6 +6,8 @@ import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/sync_service.dart';
+import '../services/simple_background_service.dart';
+import '../services/optimized_storage_service.dart';
 import '../models/rescue.dart';
 import '../models/track.dart';
 import '../models/location_point.dart';
@@ -27,13 +30,15 @@ class _RescueScreenState extends State<RescueScreen> {
   final LocationService _locationService = LocationService();
   final StorageService _storageService = StorageService();
   final SyncService _syncService = SyncService();
+  final SimpleBackgroundService _backgroundService = SimpleBackgroundService();
+  final OptimizedStorageService _optimizedStorage = OptimizedStorageService();
 
   Rescue? _rescue;
-  List<Track> _tracks = [];
   bool _isLoading = true;
   bool _isTracking = false;
   String _userId = '';
   String _userName = '';
+  Map<String, dynamic> _trackStats = {};
 
   @override
   void initState() {
@@ -69,8 +74,9 @@ class _RescueScreenState extends State<RescueScreen> {
         return;
       }
 
-      // 获取轨迹信息
-      await _loadTracks();
+      _locationService.initialize();
+      // 获取轨迹统计信息
+      await _loadTrackStats();
 
       // 初始化同步服务
       await _syncService.initialize(widget.rescueId, _userId);
@@ -87,15 +93,15 @@ class _RescueScreenState extends State<RescueScreen> {
     }
   }
 
-  /// 加载轨迹信息
-  Future<void> _loadTracks() async {
+  /// 加载轨迹统计信息
+  Future<void> _loadTrackStats() async {
     try {
-      final tracks = await ApiService.getRescueTracks(widget.rescueId);
+      final stats = await _backgroundService.getCurrentTrackStats();
       setState(() {
-        _tracks = tracks;
+        _trackStats = stats;
       });
     } catch (e) {
-      print('加载轨迹失败: $e');
+      print('加载轨迹统计失败: $e');
     }
   }
 
@@ -103,24 +109,28 @@ class _RescueScreenState extends State<RescueScreen> {
   Future<void> _toggleTracking() async {
     if (_isTracking) {
       // 停止轨迹记录
-      await _locationService.stopTracking();
+      await _backgroundService.stopBackgroundTracking();
       setState(() {
         _isTracking = false;
       });
       _showToast('轨迹记录已停止');
     } else {
       // 开始轨迹记录
-      final success =
-          await _locationService.startTracking(widget.rescueId, _userId);
+      final success = await _backgroundService.startBackgroundTracking(
+          widget.rescueId, _userId);
       if (success) {
         setState(() {
           _isTracking = true;
         });
         _showToast('轨迹记录已开始');
 
-        // 监听位置更新
-        _locationService.locationStream.listen((locationPoint) {
-          _onLocationUpdate(locationPoint);
+        // 定期更新统计信息
+        Timer.periodic(const Duration(seconds: 30), (timer) {
+          if (!_isTracking) {
+            timer.cancel();
+            return;
+          }
+          _loadTrackStats();
         });
       } else {
         _showToast('无法开始轨迹记录，请检查位置权限');
@@ -156,7 +166,7 @@ class _RescueScreenState extends State<RescueScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: _loadTracks,
+            onPressed: _loadTrackStats,
             icon: const Icon(Icons.refresh),
             tooltip: '刷新',
           ),
@@ -333,102 +343,94 @@ class _RescueScreenState extends State<RescueScreen> {
                 const SizedBox(height: 16),
 
                 // 轨迹统计
-                Consumer<LocationService>(
-                  builder: (context, locationService, child) {
-                    final trackPoints = locationService.trackPoints;
-                    final totalDistance = locationService.getTotalDistance();
-                    final averageSpeed = locationService.getAverageSpeed();
-
-                    return Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.blue[200]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.blue[200]!,
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.timeline,
-                                color: Colors.blue[600],
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '轨迹统计',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[800],
-                                ),
-                              ),
-                            ],
+                          Icon(
+                            Icons.timeline,
+                            color: Colors.blue[600],
+                            size: 20,
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '记录点数: ${trackPoints.length}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                    Text(
-                                      '总距离: ${(totalDistance / 1000).toStringAsFixed(2)}km',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '平均速度: ${(averageSpeed * 3.6).toStringAsFixed(1)}km/h',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                    Text(
-                                      '状态: ${_isTracking ? "记录中" : "已停止"}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: _isTracking
-                                            ? Colors.green[700]
-                                            : Colors.grey[700],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          const SizedBox(width: 8),
+                          Text(
+                            '轨迹统计',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[800],
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '记录点数: ${_trackStats['pointCount'] ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                Text(
+                                  '总距离: ${((_trackStats['distance'] ?? 0.0) / 1000).toStringAsFixed(2)}km',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '时长: ${_formatDuration(_trackStats['duration'] ?? Duration.zero)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                Text(
+                                  '状态: ${_isTracking ? "记录中" : "已停止"}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _isTracking
+                                        ? Colors.green[700]
+                                        : Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 16),
 
                 // 控制按钮
                 Padding(
@@ -486,5 +488,20 @@ class _RescueScreenState extends State<RescueScreen> {
               ],
             ),
     );
+  }
+
+  /// 格式化时长
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final seconds = duration.inSeconds % 60;
+
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    } else {
+      return '${seconds}s';
+    }
   }
 }
