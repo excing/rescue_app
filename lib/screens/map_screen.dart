@@ -27,7 +27,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   final StorageService _storageService = StorageService();
-  
+
   List<Track> _tracks = [];
   bool _isLoading = true;
   bool _showCurrentLocation = true;
@@ -45,13 +45,14 @@ class _MapScreenState extends State<MapScreen> {
     try {
       // 加载轨迹数据
       await _loadTracks();
-      
+
       // 如果有救援位置，移动地图到救援位置
       if (widget.rescue?.location != null) {
         _mapController.move(widget.rescue!.location, 15.0);
       } else {
         // 否则移动到当前位置
-        final locationService = Provider.of<LocationService>(context, listen: false);
+        final locationService =
+            Provider.of<LocationService>(context, listen: false);
         final position = locationService.currentPosition;
         if (position != null) {
           _mapController.move(
@@ -60,7 +61,7 @@ class _MapScreenState extends State<MapScreen> {
           );
         }
       }
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -77,21 +78,22 @@ class _MapScreenState extends State<MapScreen> {
     try {
       // 从服务器获取轨迹
       final serverTracks = await ApiService.getRescueTracks(widget.rescueId);
-      
+
       // 从本地获取轨迹
-      final localTracks = await _storageService.getRescueTracks(widget.rescueId);
-      
+      final localTracks =
+          await _storageService.getRescueTracks(widget.rescueId);
+
       // 合并轨迹数据（去重）
       final allTracks = <String, Track>{};
-      
+
       for (final track in localTracks) {
         allTracks[track.id] = track;
       }
-      
+
       for (final track in serverTracks) {
         allTracks[track.id] = track;
       }
-      
+
       setState(() {
         _tracks = allTracks.values.toList();
       });
@@ -102,7 +104,8 @@ class _MapScreenState extends State<MapScreen> {
 
   /// 开始位置更新
   void _startLocationUpdates() {
-    final locationService = Provider.of<LocationService>(context, listen: false);
+    final locationService =
+        Provider.of<LocationService>(context, listen: false);
     locationService.locationStream.listen((locationPoint) {
       if (_followCurrentLocation) {
         _mapController.move(locationPoint.position, _mapController.camera.zoom);
@@ -112,7 +115,8 @@ class _MapScreenState extends State<MapScreen> {
 
   /// 移动到当前位置
   void _moveToCurrentLocation() {
-    final locationService = Provider.of<LocationService>(context, listen: false);
+    final locationService =
+        Provider.of<LocationService>(context, listen: false);
     final position = locationService.currentPosition;
     if (position != null) {
       _mapController.move(
@@ -134,19 +138,19 @@ class _MapScreenState extends State<MapScreen> {
     if (_tracks.isEmpty) return;
 
     final allPoints = <LatLng>[];
-    
+
     // 添加救援位置
     if (widget.rescue?.location != null) {
       allPoints.add(widget.rescue!.location);
     }
-    
+
     // 添加所有轨迹点
     for (final track in _tracks) {
       for (final point in track.points) {
         allPoints.add(point.position);
       }
     }
-    
+
     if (allPoints.isNotEmpty) {
       final bounds = _calculateBounds(allPoints);
       _mapController.fitCamera(
@@ -206,7 +210,7 @@ class _MapScreenState extends State<MapScreen> {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: widget.rescue?.location ?? 
+                    initialCenter: widget.rescue?.location ??
                         const LatLng(39.9042, 116.4074), // 默认北京
                     initialZoom: 15.0,
                     minZoom: 3.0,
@@ -215,11 +219,12 @@ class _MapScreenState extends State<MapScreen> {
                   children: [
                     // 瓦片图层 - 使用OpenStreetMap
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://huw.blendiv.com/api/tile?s={s}&x={x}&y={y}&z={z}',
                       userAgentPackageName: 'com.example.rescue_app',
                       maxZoom: 18,
                     ),
-                    
+
                     // 救援位置标记
                     if (widget.rescue?.location != null)
                       MarkerLayer(
@@ -253,7 +258,7 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                         ],
                       ),
-                    
+
                     // 轨迹线条
                     PolylineLayer(
                       polylines: _tracks.map((track) {
@@ -264,18 +269,19 @@ class _MapScreenState extends State<MapScreen> {
                         );
                       }).toList(),
                     ),
-                    
+
                     // 当前位置标记
                     if (_showCurrentLocation)
                       Consumer<LocationService>(
                         builder: (context, locationService, child) {
                           final position = locationService.currentPosition;
                           if (position == null) return const SizedBox.shrink();
-                          
+
                           return MarkerLayer(
                             markers: [
                               Marker(
-                                point: LatLng(position.latitude, position.longitude),
+                                point: LatLng(
+                                    position.latitude, position.longitude),
                                 width: 40,
                                 height: 40,
                                 child: Container(
@@ -298,12 +304,12 @@ class _MapScreenState extends State<MapScreen> {
                           );
                         },
                       ),
-                    
+
                     // 轨迹起点和终点标记
                     MarkerLayer(
                       markers: _tracks.expand((track) {
                         final markers = <Marker>[];
-                        
+
                         if (track.points.isNotEmpty) {
                           // 起点
                           markers.add(
@@ -328,7 +334,7 @@ class _MapScreenState extends State<MapScreen> {
                               ),
                             ),
                           );
-                          
+
                           // 终点（如果不是活跃轨迹）
                           if (!track.isActive && track.points.length > 1) {
                             markers.add(
@@ -355,13 +361,13 @@ class _MapScreenState extends State<MapScreen> {
                             );
                           }
                         }
-                        
+
                         return markers;
                       }).toList(),
                     ),
                   ],
                 ),
-                
+
                 // 控制按钮
                 Positioned(
                   right: 16,
@@ -373,22 +379,24 @@ class _MapScreenState extends State<MapScreen> {
                         heroTag: "current_location",
                         onPressed: _moveToCurrentLocation,
                         backgroundColor: Colors.blue[600],
-                        child: const Icon(Icons.my_location, color: Colors.white),
+                        child:
+                            const Icon(Icons.my_location, color: Colors.white),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // 救援位置按钮
                       if (widget.rescue?.location != null)
                         FloatingActionButton(
                           heroTag: "rescue_location",
                           onPressed: _moveToRescueLocation,
                           backgroundColor: Colors.red[600],
-                          child: const Icon(Icons.emergency, color: Colors.white),
+                          child:
+                              const Icon(Icons.emergency, color: Colors.white),
                         ),
                     ],
                   ),
                 ),
-                
+
                 // 轨迹信息面板
                 if (_tracks.isNotEmpty)
                   Positioned(
