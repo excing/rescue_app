@@ -36,8 +36,11 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMapData();
     _startLocationUpdates();
+    // 延迟加载地图数据，确保地图已渲染
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMapData();
+    });
   }
 
   /// 加载地图数据
@@ -51,14 +54,16 @@ class _MapScreenState extends State<MapScreen> {
         _mapController.move(widget.rescue!.location, 15.0);
       } else {
         // 否则移动到当前位置
-        final locationService =
-            Provider.of<LocationService>(context, listen: false);
-        final position = locationService.currentPosition;
-        if (position != null) {
-          _mapController.move(
-            LatLng(position.latitude, position.longitude),
-            15.0,
-          );
+        if (mounted) {
+          final locationService =
+              Provider.of<LocationService>(context, listen: false);
+          final position = locationService.currentPosition;
+          if (position != null) {
+            _mapController.move(
+              LatLng(position.latitude, position.longitude),
+              15.0,
+            );
+          }
         }
       }
 
@@ -225,47 +230,49 @@ class _MapScreenState extends State<MapScreen> {
                       maxZoom: 18,
                     ),
 
-                    // 救援位置标记
+                    // 救援位置标记 - 优化尺寸和设计
                     if (widget.rescue?.location != null)
                       MarkerLayer(
                         markers: [
                           Marker(
                             point: widget.rescue!.location,
-                            width: 60,
-                            height: 60,
+                            width: 32,
+                            height: 32,
                             child: Container(
                               decoration: BoxDecoration(
                                 color: Colors.red[600],
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: Colors.white,
-                                  width: 3,
+                                  width: 2,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.emergency,
                                 color: Colors.white,
-                                size: 30,
+                                size: 18,
                               ),
                             ),
                           ),
                         ],
                       ),
 
-                    // 轨迹线条
+                    // 轨迹线条 - 优化粗细和样式
                     PolylineLayer(
                       polylines: _tracks.map((track) {
                         return Polyline(
                           points: track.points.map((p) => p.position).toList(),
                           color: track.color,
-                          strokeWidth: 3.0,
+                          strokeWidth: 2.5,
+                          borderStrokeWidth: 0.5,
+                          borderColor: Colors.white.withValues(alpha: 0.8),
                         );
                       }).toList(),
                     ),
@@ -282,21 +289,29 @@ class _MapScreenState extends State<MapScreen> {
                               Marker(
                                 point: LatLng(
                                     position.latitude, position.longitude),
-                                width: 40,
-                                height: 40,
+                                width: 24,
+                                height: 24,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.blue[600],
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white,
-                                      width: 3,
+                                      width: 2,
                                     ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            Colors.blue.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
                                   ),
                                   child: const Icon(
                                     Icons.my_location,
                                     color: Colors.white,
-                                    size: 20,
+                                    size: 14,
                                   ),
                                 ),
                               ),
@@ -305,31 +320,38 @@ class _MapScreenState extends State<MapScreen> {
                         },
                       ),
 
-                    // 轨迹起点和终点标记
+                    // 轨迹起点和终点标记 - 更小更精致
                     MarkerLayer(
                       markers: _tracks.expand((track) {
                         final markers = <Marker>[];
 
                         if (track.points.isNotEmpty) {
-                          // 起点
+                          // 起点 - 使用小圆点
                           markers.add(
                             Marker(
                               point: track.points.first.position,
-                              width: 20,
-                              height: 20,
+                              width: 12,
+                              height: 12,
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: track.color,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
-                                    width: 2,
+                                    width: 1.5,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: track.color.withValues(alpha: 0.4),
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
                                 ),
                                 child: const Icon(
                                   Icons.play_arrow,
                                   color: Colors.white,
-                                  size: 12,
+                                  size: 8,
                                 ),
                               ),
                             ),
@@ -340,21 +362,29 @@ class _MapScreenState extends State<MapScreen> {
                             markers.add(
                               Marker(
                                 point: track.points.last.position,
-                                width: 20,
-                                height: 20,
+                                width: 12,
+                                height: 12,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: track.color,
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white,
-                                      width: 2,
+                                      width: 1.5,
                                     ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            track.color.withValues(alpha: 0.4),
+                                        blurRadius: 4,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
                                   ),
                                   child: const Icon(
                                     Icons.stop,
                                     color: Colors.white,
-                                    size: 12,
+                                    size: 8,
                                   ),
                                 ),
                               ),
@@ -368,31 +398,102 @@ class _MapScreenState extends State<MapScreen> {
                   ],
                 ),
 
-                // 控制按钮
+                // 控制按钮 - 优化设计
                 Positioned(
-                  right: 16,
+                  right: 12,
                   bottom: 100,
                   child: Column(
                     children: [
                       // 当前位置按钮
-                      FloatingActionButton(
-                        heroTag: "current_location",
-                        onPressed: _moveToCurrentLocation,
-                        backgroundColor: Colors.blue[600],
-                        child:
-                            const Icon(Icons.my_location, color: Colors.white),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[600],
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _moveToCurrentLocation,
+                            child: const Icon(
+                              Icons.my_location,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
 
                       // 救援位置按钮
                       if (widget.rescue?.location != null)
-                        FloatingActionButton(
-                          heroTag: "rescue_location",
-                          onPressed: _moveToRescueLocation,
-                          backgroundColor: Colors.red[600],
-                          child:
-                              const Icon(Icons.emergency, color: Colors.white),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.red[600],
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: _moveToRescueLocation,
+                              child: const Icon(
+                                Icons.emergency,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
                         ),
+
+                      const SizedBox(height: 12),
+
+                      // 适应所有轨迹按钮
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.green[600],
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _fitAllTracks,
+                            child: const Icon(
+                              Icons.fit_screen,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -406,11 +507,11 @@ class _MapScreenState extends State<MapScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -429,49 +530,59 @@ class _MapScreenState extends State<MapScreen> {
                           ),
                           const SizedBox(height: 8),
                           SizedBox(
-                            height: 60,
+                            height: 50,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
                               itemCount: _tracks.length,
                               itemBuilder: (context, index) {
                                 final track = _tracks[index];
                                 return Container(
-                                  margin: const EdgeInsets.only(right: 12),
-                                  padding: const EdgeInsets.all(8),
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: track.color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: track.color.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
                                       color: track.color,
-                                      width: 2,
+                                      width: 1.5,
                                     ),
                                   ),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         track.userName,
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                           color: track.color,
                                         ),
                                       ),
-                                      Text(
-                                        '${track.points.length}点',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: track.color,
-                                        ),
-                                      ),
-                                      if (track.totalDistance != null)
-                                        Text(
-                                          '${(track.totalDistance! / 1000).toStringAsFixed(1)}km',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: track.color,
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${track.points.length}点',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: track.color,
+                                            ),
                                           ),
-                                        ),
+                                          if (track.totalDistance != null) ...[
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${(track.totalDistance! / 1000).toStringAsFixed(1)}km',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: track.color,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 );
