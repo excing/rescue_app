@@ -21,9 +21,10 @@ class SyncService extends ChangeNotifier {
   bool _isOnline = false;
   String? _currentRescueId;
   String? _currentUserId;
+  DateTime? _lastManualSync;
 
   // 同步配置
-  static const Duration _syncInterval = Duration(minutes: 2); // 每2分钟同步一次
+  static const Duration _syncInterval = Duration(minutes: 1); // 每1分钟同步一次
   static const int _batchSize = 50; // 每批同步50个位置点
 
   bool get isSyncing => _isSyncing;
@@ -42,6 +43,9 @@ class SyncService extends ChangeNotifier {
 
     // 监听位置更新
     _locationService.locationStream.listen(_onLocationUpdate);
+
+    // 初始同步：下载所有用户的轨迹
+    await _downloadAllUsersToLocal();
   }
 
   /// 检查网络连接
@@ -106,6 +110,9 @@ class SyncService extends ChangeNotifier {
       // 同步轨迹信息
       await _syncTrack();
 
+      // 下载该救援下所有用户的轨迹并存到本地
+      await _downloadAllUsersToLocal();
+
       print('同步完成');
     } catch (e) {
       print('同步失败: $e');
@@ -139,7 +146,7 @@ class SyncService extends ChangeNotifier {
             : unsyncedPoints.length;
         final batch = unsyncedPoints.sublist(i, end);
 
-        final success = await ApiService.uploadLocationPoints(
+        final success = await ApiService.uploadUserPointsCompact(
           _currentRescueId!,
           _currentUserId!,
           batch,
@@ -183,7 +190,7 @@ class SyncService extends ChangeNotifier {
       }).toList();
 
       if (recentUnsyncedPoints.isNotEmpty) {
-        final success = await ApiService.uploadLocationPoints(
+        final success = await ApiService.uploadUserPointsCompact(
           _currentRescueId!,
           _currentUserId!,
           recentUnsyncedPoints,
@@ -247,13 +254,50 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// 手动触发同步
+  /// 下载该救援下所有用户的紧凑轨迹数据并存到本地（本地优先）
+  Future<void> _downloadAllUsersToLocal() async {
+    if (_currentRescueId == null) return;
+    try {
+      await _checkNetworkConnection();
+      if (!_isOnline) return;
+      final byUser = await ApiService.getAllUsersCompactCSV(_currentRescueId!);
+      for (final entry in byUser.entries) {
+        final userId = entry.key;
+        final csvs = entry.value;
+        // 解析
+        final points = <LocationPoint>[];
+        for (final csv in csvs) {
+          try {
+            final p = LocationPoint.fromCompactCSV(csv,
+                userId: userId, rescueId: _currentRescueId!);
+            points.add(p);
+          } catch (_) {}
+        }
+        points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        if (points.isEmpty) continue;
+        // 批量保存到本地
+        await _storageService.saveLocationPoints(points);
+      }
+    } catch (e) {
+      print('下载所有用户轨迹失败: $e');
+    }
+  }
+
+  /// 手动触发同步（最小间隔5秒），并拉取所有用户轨迹
   Future<void> manualSync() async {
+    final now = DateTime.now();
+    if (_lastManualSync != null &&
+        now.difference(_lastManualSync!) < const Duration(seconds: 5)) {
+      return;
+    }
+    _lastManualSync = now;
+
     if (_isSyncing) {
       return;
     }
 
     await _performSync();
+    await _downloadAllUsersToLocal();
   }
 
   /// 强制同步所有数据
@@ -277,7 +321,7 @@ class SyncService extends ChangeNotifier {
       );
 
       if (allUnsyncedPoints.isNotEmpty) {
-        final success = await ApiService.uploadLocationPoints(
+        final success = await ApiService.uploadUserPointsCompact(
           _currentRescueId!,
           _currentUserId!,
           allUnsyncedPoints,

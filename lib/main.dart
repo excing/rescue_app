@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'screens/home_screen.dart';
 import 'services/location_service.dart';
 
@@ -12,22 +13,24 @@ class RescueApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => LocationService()),
-      ],
-      child: MaterialApp(
-        title: '救援APP',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
+    return WithForegroundTask(
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => LocationService()),
+        ],
+        child: MaterialApp(
+          title: '救援APP',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            fontFamily: 'PingFang SC',
           ),
-          useMaterial3: true,
-          fontFamily: 'PingFang SC',
+          home: const HomeScreen(),
+          debugShowCheckedModeBanner: false,
         ),
-        home: const HomeScreen(),
-        debugShowCheckedModeBanner: false,
       ),
     );
   }

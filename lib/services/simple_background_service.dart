@@ -1,13 +1,15 @@
 import 'dart:async';
-import 'dart:isolate';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'location_service.dart';
 import 'optimized_storage_service.dart';
+import 'storage_service.dart';
 import '../models/location_point.dart';
+import 'foreground_task_handler.dart';
 
-/// 简化的后台服务 - 使用Timer实现定期定位
+/// 后台服务：集成前台服务以确保Android锁屏/熄屏持续定位
 class SimpleBackgroundService extends ChangeNotifier {
   static final SimpleBackgroundService _instance =
       SimpleBackgroundService._internal();
@@ -21,6 +23,7 @@ class SimpleBackgroundService extends ChangeNotifier {
 
   final LocationService _locationService = LocationService();
   final OptimizedStorageService _storageService = OptimizedStorageService();
+  final StorageService _legacyStorage = StorageService();
 
   // 后台定位配置
   static const Duration _backgroundInterval = Duration(minutes: 1); // 每分钟定位一次
@@ -30,7 +33,7 @@ class SimpleBackgroundService extends ChangeNotifier {
   bool get isRunning => _isRunning;
   String? get currentRescueId => _currentRescueId;
 
-  /// 启动后台定位服务
+  /// 启动后台定位服务（Android 前台服务 + 定期定位）
   Future<bool> startBackgroundTracking(String rescueId, String userId) async {
     try {
       if (_isRunning) {
@@ -41,7 +44,6 @@ class SimpleBackgroundService extends ChangeNotifier {
       // 初始化服务
       await _storageService.initialize();
       final locationInitialized = await _locationService.initialize();
-
       if (!locationInitialized) {
         print('位置服务初始化失败');
         return false;
@@ -51,7 +53,45 @@ class SimpleBackgroundService extends ChangeNotifier {
       _currentUserId = userId;
       _isRunning = true;
 
-      // 启动定期定位
+      // Android：启动前台服务通知（如果可用）
+      try {
+        // 通知权限（Android 13+）
+        final notiStatus = await FlutterForegroundTask.checkNotificationPermission();
+        if (notiStatus != NotificationPermission.granted) {
+          await FlutterForegroundTask.requestNotificationPermission();
+        }
+
+        // 将上下文写入服务数据区
+        await FlutterForegroundTask.saveData(key: 'userId', value: userId);
+        await FlutterForegroundTask.saveData(key: 'rescueId', value: rescueId);
+
+        FlutterForegroundTask.init(
+          androidNotificationOptions: AndroidNotificationOptions(
+            channelId: 'rescue_location',
+            channelName: '救援定位',
+            channelDescription: '持续定位以记录救援轨迹',
+            channelImportance: NotificationChannelImportance.HIGH,
+            priority: NotificationPriority.HIGH,
+            showBadge: true,
+          ),
+          iosNotificationOptions: const IOSNotificationOptions(showNotification: true),
+          foregroundTaskOptions: ForegroundTaskOptions(
+            eventAction: ForegroundTaskEventAction.repeat(60000),
+            autoRunOnBoot: false,
+            allowWakeLock: true,
+            allowWifiLock: true,
+          ),
+        );
+        await FlutterForegroundTask.startService(
+          notificationTitle: '救援定位',
+          notificationText: '正在持续记录轨迹',
+          callback: startCallback,
+        );
+      } catch (e) {
+        // iOS 或不支持时忽略，走Timer
+      }
+
+      // 启动定期定位（兜底）
       _startPeriodicLocation();
 
       print('后台定位服务启动成功');
@@ -66,6 +106,26 @@ class SimpleBackgroundService extends ChangeNotifier {
   /// 停止后台定位服务
   Future<void> stopBackgroundTracking() async {
     try {
+      // 在停止时追加一条全0经纬度的停止标记
+      if (_currentRescueId != null && _currentUserId != null) {
+        final stopPoint = LocationPoint(
+          position: const LatLng(0, 0),
+          altitude: 0,
+          accuracy: 0,
+          timestamp: DateTime.now(),
+          userId: _currentUserId!,
+          rescueId: _currentRescueId!,
+          marked: false,
+        );
+        // 保存到两套本地存储，确保同步服务可发现
+        try {
+          await _legacyStorage.saveLocationPoint(stopPoint);
+        } catch (_) {}
+        try {
+          await _storageService.saveLocationPointSmart(stopPoint);
+        } catch (_) {}
+      }
+
       _backgroundTimer?.cancel();
       _backgroundTimer = null;
       _isRunning = false;

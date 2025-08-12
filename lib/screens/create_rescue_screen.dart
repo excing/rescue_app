@@ -20,7 +20,7 @@ class CreateRescueScreen extends StatefulWidget {
 class _CreateRescueScreenState extends State<CreateRescueScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final LocationService _locationService = LocationService();
-  
+
   String _rescueId = '';
   LatLng? _selectedLocation;
   double? _selectedAltitude;
@@ -80,7 +80,7 @@ class _CreateRescueScreenState extends State<CreateRescueScreen> {
   /// 创建救援
   Future<void> _createRescue() async {
     final description = _descriptionController.text.trim();
-    
+
     if (description.isEmpty) {
       _showToast('请输入救援描述');
       return;
@@ -124,13 +124,13 @@ class _CreateRescueScreenState extends State<CreateRescueScreen> {
 
       // 上传到服务器
       final success = await ApiService.createRescue(rescue);
-      
+
       if (success) {
         _showToast('救援创建成功');
-        
+
         // 保存最近使用的救援号
         await StorageService().saveUserPreference('last_rescue_id', _rescueId);
-        
+
         // 进入救援页面
         if (mounted) {
           Navigator.pushReplacement(
@@ -184,246 +184,277 @@ class _CreateRescueScreenState extends State<CreateRescueScreen> {
             ],
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 救援号显示
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.confirmation_number,
-                            color: Colors.orange[600],
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '救援号',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            onPressed: () {
-                              _generateRescueId();
-                              setState(() {});
-                            },
-                            icon: Icon(
-                              Icons.refresh,
-                              color: Colors.orange[600],
-                            ),
-                            tooltip: '重新生成',
+        child: Column(
+          children: [
+            // 滚动内容区域
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 救援号显示
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.orange[200]!,
-                            width: 2,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _rescueId,
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange[800],
-                                letterSpacing: 8,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: _rescueId));
-                                _showToast('救援号已复制');
-                              },
-                              icon: Icon(
-                                Icons.copy,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.confirmation_number,
                                 color: Colors.orange[600],
+                                size: 24,
                               ),
-                              tooltip: '复制救援号',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // 救援描述输入
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.description,
-                            color: Colors.blue[600],
-                            size: 24,
+                              const SizedBox(width: 12),
+                              Text(
+                                '救援号',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                onPressed: () {
+                                  _generateRescueId();
+                                  setState(() {});
+                                },
+                                icon: Icon(
+                                  Icons.refresh,
+                                  color: Colors.orange[600],
+                                ),
+                                tooltip: '重新生成',
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '救援描述',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.orange[200]!,
+                                width: 2,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _rescueId,
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange[800],
+                                    letterSpacing: 8,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                IconButton(
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                        ClipboardData(text: _rescueId));
+                                    _showToast('救援号已复制');
+                                  },
+                                  icon: Icon(
+                                    Icons.copy,
+                                    color: Colors.orange[600],
+                                  ),
+                                  tooltip: '复制救援号',
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _descriptionController,
-                        maxLines: 3,
-                        maxLength: 200,
-                        decoration: InputDecoration(
-                          hintText: '请描述救援任务的详细信息...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 救援描述输入
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.blue[600]!,
-                              width: 2,
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // 位置信息
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.location_on,
-                            color: Colors.green[600],
-                            size: 24,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.description,
+                                color: Colors.blue[600],
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '救援描述',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '救援位置',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _descriptionController,
+                            maxLines: 3,
+                            maxLength: 200,
+                            decoration: InputDecoration(
+                              hintText: '请描述救援任务的详细信息...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.blue[600]!,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                           ),
-                          const Spacer(),
-                          if (_isGettingLocation)
-                            const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            IconButton(
-                              onPressed: _getCurrentLocation,
-                              icon: Icon(
-                                Icons.my_location,
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 位置信息
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
                                 color: Colors.green[600],
+                                size: 24,
                               ),
-                              tooltip: '重新获取位置',
+                              const SizedBox(width: 12),
+                              Text(
+                                '救援位置',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_isGettingLocation)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                IconButton(
+                                  onPressed: _getCurrentLocation,
+                                  icon: Icon(
+                                    Icons.my_location,
+                                    color: Colors.green[600],
+                                  ),
+                                  tooltip: '重新获取位置',
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (_selectedLocation != null) ...[
+                            _buildLocationInfo('纬度',
+                                _selectedLocation!.latitude.toStringAsFixed(6)),
+                            const SizedBox(height: 8),
+                            _buildLocationInfo(
+                                '经度',
+                                _selectedLocation!.longitude
+                                    .toStringAsFixed(6)),
+                            if (_selectedAltitude != null) ...[
+                              const SizedBox(height: 8),
+                              _buildLocationInfo('海拔',
+                                  '${_selectedAltitude!.toStringAsFixed(1)}m'),
+                            ],
+                          ] else
+                            Text(
+                              '正在获取位置信息...',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      if (_selectedLocation != null) ...[
-                        _buildLocationInfo('纬度', _selectedLocation!.latitude.toStringAsFixed(6)),
-                        const SizedBox(height: 8),
-                        _buildLocationInfo('经度', _selectedLocation!.longitude.toStringAsFixed(6)),
-                        if (_selectedAltitude != null) ...[
-                          const SizedBox(height: 8),
-                          _buildLocationInfo('海拔', '${_selectedAltitude!.toStringAsFixed(1)}m'),
-                        ],
-                      ] else
-                        Text(
-                          '正在获取位置信息...',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+
+                    // 底部留出按钮空间
+                    const SizedBox(height: 20),
+                  ],
                 ),
-                
-                const Spacer(),
-                
-                // 创建按钮
-                SizedBox(
+              ),
+            ),
+
+            // 固定在底部的创建按钮
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: (_isLoading || _selectedLocation == null) ? null : _createRescue,
+                    onPressed: (_isLoading || _selectedLocation == null)
+                        ? null
+                        : _createRescue,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange[600],
                       foregroundColor: Colors.white,
@@ -438,7 +469,8 @@ class _CreateRescueScreenState extends State<CreateRescueScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(
@@ -450,11 +482,9 @@ class _CreateRescueScreenState extends State<CreateRescueScreen> {
                           ),
                   ),
                 ),
-                
-                const SizedBox(height: 16),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

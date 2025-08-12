@@ -45,5 +45,19 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- 位置权限文案 -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>需要访问您的位置用于救援轨迹记录和定位。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>需要在后台访问您的位置用于持续记录救援轨迹。</string>
+
+	<!-- 后台模式：定位与刷新 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>processing</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

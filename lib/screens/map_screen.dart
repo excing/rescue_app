@@ -4,7 +4,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/rescue.dart';
 import '../models/track.dart';
-import '../models/location_point.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
@@ -81,8 +80,13 @@ class _MapScreenState extends State<MapScreen> {
   /// 加载轨迹数据
   Future<void> _loadTracks() async {
     try {
-      // 从服务器获取轨迹
-      final serverTracks = await ApiService.getRescueTracks(widget.rescueId);
+      // 从服务器获取新规范的紧凑轨迹
+      final compactTracks =
+          await ApiService.getRescueTracksFromCompact(widget.rescueId);
+
+      // 从服务器获取旧track文档（兼容）
+      final legacyServerTracks =
+          await ApiService.getRescueTracks(widget.rescueId);
 
       // 从本地获取轨迹
       final localTracks =
@@ -94,9 +98,12 @@ class _MapScreenState extends State<MapScreen> {
       for (final track in localTracks) {
         allTracks[track.id] = track;
       }
-
-      for (final track in serverTracks) {
+      for (final track in legacyServerTracks) {
         allTracks[track.id] = track;
+      }
+      // 使用 userId 作为键合并紧凑轨迹（每人一条覆盖）
+      for (final track in compactTracks) {
+        allTracks['track_${track.userId}'] = track;
       }
 
       setState(() {
