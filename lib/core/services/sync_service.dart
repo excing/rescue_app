@@ -95,10 +95,10 @@ class SyncService {
       _lastSyncError = null;
 
       // 1. 同步救援信息
-      final rescueResult = await _syncRescueData(rescueId);
-      if (!rescueResult.isSuccess) {
-        throw Exception('同步救援信息失败: ${rescueResult.error}');
-      }
+      // final rescueResult = await _syncRescueData(rescueId);
+      // if (!rescueResult.isSuccess) {
+      //   throw Exception('同步救援信息失败: ${rescueResult.error}');
+      // }
 
       // 2. 上传本地轨迹数据
       final uploadResult = await _uploadLocalTracks(rescueId, userId);

@@ -132,6 +132,8 @@ class ApiService {
         queryParameters: {
           'collection': 'rescue-$rescueId',
           'limit': 100,
+          'orderBy': 'updatedAt',
+          'orderDirection': 'desc',
         },
       );
 
