@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # 地图相关
-  flutter_map: ^7.0.2
+  flutter_map: ^8.2.1
   latlong2: ^0.9.1
 
   # GPS定位

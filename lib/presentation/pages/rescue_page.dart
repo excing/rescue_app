@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rescue_app/presentation/pages/home_page.dart';
 
+import '../../core/models/track_point_model.dart';
 import '../../core/providers/rescue_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/sync_provider.dart';
+import '../../core/services/background_location_service.dart';
+import '../widgets/rescue_map_widget.dart';
+import '../widgets/track_display_widget.dart';
 
 /// 救援页面
 ///
@@ -25,6 +29,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   bool _showInfoPanel = true;
   bool _isTracking = false;
+  bool _showTrackView = false;
+  List<TrackPointModel> _trackPoints = [];
 
   @override
   void initState() {
@@ -63,6 +69,9 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
     // 初始化服务
     _initializeServices();
+
+    // 加载轨迹数据
+    _loadTrackData();
   }
 
   @override
@@ -87,6 +96,30 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
       // 启动自动同步
       syncProvider.startAutoSync();
+    }
+  }
+
+  /// 加载轨迹数据
+  Future<void> _loadTrackData() async {
+    final rescueProvider = context.read<RescueProvider>();
+    if (rescueProvider.currentRescue != null) {
+      try {
+        // 从本地缓存加载轨迹点
+        final trackPoints = await BackgroundLocationService.getLocalTrackPoints(
+          rescueProvider.currentRescue!.id,
+          'current_user', // TODO: 从用户服务获取
+        );
+
+        if (mounted) {
+          setState(() {
+            _trackPoints = trackPoints;
+          });
+        }
+
+        debugPrint('已加载 ${trackPoints.length} 个轨迹点');
+      } catch (e) {
+        debugPrint('加载轨迹数据失败: $e');
+      }
     }
   }
 
@@ -172,49 +205,26 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   /// 构建地图背景
   Widget _buildMapBackground() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF2196F3),
-            Color(0xFFE3F2FD),
-          ],
-        ),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.map,
-              size: 120,
-              color: Colors.white70,
-            ),
-            SizedBox(height: 16),
-            Text(
-              '地图区域',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white70,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '地图功能即将完成',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white60,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    if (_showTrackView) {
+      // 显示轨迹视图
+      return TrackDisplayWidget(
+        rescueId: context.read<RescueProvider>().currentRescue?.id ?? '',
+        userId: 'current_user', // TODO: 从用户服务获取
+        trackPoints: _trackPoints,
+        showDetails: true,
+      );
+    } else {
+      // 显示地图视图
+      return RescueMapWidget(
+        trackPoints: _trackPoints,
+        showTrack: true,
+        showCurrentLocation: true,
+        onMapTap: (location) {
+          // 处理地图点击
+          debugPrint('地图点击: ${location.latitude}, ${location.longitude}');
+        },
+      );
+    }
   }
 
   /// 构建顶部信息面板
@@ -426,6 +436,9 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                // 视图切换按钮
+                _buildViewToggleButton(),
+
                 // 开始/停止记录按钮
                 _buildTrackingButton(locationProvider, rescueProvider),
 
@@ -542,6 +555,24 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
               : const Icon(Icons.sync, color: Colors.white),
         );
       },
+    );
+  }
+
+  /// 构建视图切换按钮
+  Widget _buildViewToggleButton() {
+    return FloatingActionButton(
+      mini: true,
+      heroTag: "view_toggle",
+      onPressed: () {
+        setState(() {
+          _showTrackView = !_showTrackView;
+        });
+      },
+      backgroundColor: _showTrackView ? Colors.orange : Colors.blue,
+      child: Icon(
+        _showTrackView ? Icons.map : Icons.timeline,
+        color: Colors.white,
+      ),
     );
   }
 

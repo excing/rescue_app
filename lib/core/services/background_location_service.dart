@@ -297,8 +297,20 @@ class BackgroundLocationService {
       String rescueId, String userId, TrackPointModel point) async {
     try {
       await DatabaseService.instance.insertTrackPoint(rescueId, userId, point);
+      debugPrint('轨迹点已保存: ${point.latitude}, ${point.longitude}');
+
+      // 同时保存到本地缓存
+      await _saveTrackPointToLocal(rescueId, userId, point);
     } catch (e) {
       debugPrint('后台保存轨迹点失败: $e');
+
+      // 如果数据库保存失败，至少保存到本地
+      try {
+        await _saveTrackPointToLocal(rescueId, userId, point);
+        debugPrint('轨迹点已保存到本地缓存');
+      } catch (localError) {
+        debugPrint('本地保存也失败: $localError');
+      }
     }
   }
 
@@ -310,6 +322,84 @@ class BackgroundLocationService {
           .insertTrackPoint(rescueId, userId, stopMarker);
     } catch (e) {
       debugPrint('后台保存停止标记失败: $e');
+    }
+  }
+
+  /// 保存轨迹点到本地缓存
+  static Future<void> _saveTrackPointToLocal(
+      String rescueId, String userId, TrackPointModel point) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'track_points_${rescueId}_$userId';
+      final existingData = prefs.getStringList(key) ?? [];
+
+      // 添加新的轨迹点（使用简单的字符串格式）
+      final pointStr =
+          '${point.latitude},${point.longitude},${point.altitude},${point.accuracy},${point.timestamp}';
+      existingData.add(pointStr);
+
+      // 保持最近1000个点，避免内存过大
+      if (existingData.length > 1000) {
+        existingData.removeRange(0, existingData.length - 1000);
+      }
+
+      await prefs.setStringList(key, existingData);
+    } catch (e) {
+      debugPrint('保存轨迹点到本地失败: $e');
+    }
+  }
+
+  /// 获取本地缓存的轨迹点
+  static Future<List<TrackPointModel>> getLocalTrackPoints(
+      String rescueId, String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'track_points_${rescueId}_$userId';
+      final data = prefs.getStringList(key) ?? [];
+
+      return data
+          .map((pointStr) {
+            try {
+              final parts = pointStr.split(',');
+              if (parts.length >= 5) {
+                final latitude = int.parse(parts[0]);
+                final longitude = int.parse(parts[1]);
+                final altitude = int.parse(parts[2]);
+                final accuracy = int.parse(parts[3]);
+                final timestamp = int.parse(parts[4]);
+
+                return TrackPointModel(
+                  latitude: latitude,
+                  longitude: longitude,
+                  altitude: altitude,
+                  accuracy: accuracy,
+                  timestamp: timestamp,
+                );
+              }
+            } catch (e) {
+              debugPrint('解析轨迹点失败: $e');
+            }
+            return null;
+          })
+          .where((point) => point != null)
+          .cast<TrackPointModel>()
+          .toList();
+    } catch (e) {
+      debugPrint('获取本地轨迹点失败: $e');
+      return [];
+    }
+  }
+
+  /// 清除本地缓存的轨迹点
+  static Future<void> clearLocalTrackPoints(
+      String rescueId, String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'track_points_${rescueId}_$userId';
+      await prefs.remove(key);
+      debugPrint('本地轨迹点缓存已清除');
+    } catch (e) {
+      debugPrint('清除本地轨迹点失败: $e');
     }
   }
 }
