@@ -6,6 +6,7 @@ import '../../core/models/track_point_model.dart';
 import '../../core/providers/rescue_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/sync_provider.dart';
+import '../../core/providers/track_sharing_provider.dart';
 import '../../core/services/background_location_service.dart';
 import '../widgets/rescue_map_widget.dart';
 import '../widgets/track_display_widget.dart';
@@ -86,13 +87,20 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     final rescueProvider = context.read<RescueProvider>();
     final locationProvider = context.read<LocationProvider>();
     final syncProvider = context.read<SyncProvider>();
+    final trackSharingProvider = context.read<TrackSharingProvider>();
 
     if (rescueProvider.currentRescue != null) {
+      final rescueId = rescueProvider.currentRescue!.id;
+      final userId = rescueProvider.getCurrentUserId();
+
       // 初始化位置服务
       await locationProvider.initialize();
 
       // 初始化同步服务
-      await syncProvider.initialize(rescueProvider.currentRescue!.id);
+      await syncProvider.initialize(rescueId);
+
+      // 初始化轨迹共享服务
+      await trackSharingProvider.initialize(rescueId, userId);
 
       // 启动自动同步
       syncProvider.startAutoSync();
@@ -205,26 +213,32 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   /// 构建地图背景
   Widget _buildMapBackground(rescueProvider) {
-    if (_showTrackView) {
-      // 显示轨迹视图
-      return TrackDisplayWidget(
-        rescueId: rescueProvider.currentRescue?.id ?? '',
-        userId: rescueProvider.getCurrentUserId(), // TODO: 从用户服务获取
-        trackPoints: _trackPoints,
-        showDetails: true,
-      );
-    } else {
-      // 显示地图视图
-      return RescueMapWidget(
-        trackPoints: _trackPoints,
-        showTrack: true,
-        showCurrentLocation: true,
-        onMapTap: (location) {
-          // 处理地图点击
-          debugPrint('地图点击: ${location.latitude}, ${location.longitude}');
-        },
-      );
-    }
+    return Consumer<TrackSharingProvider>(
+      builder: (context, trackSharingProvider, child) {
+        if (_showTrackView) {
+          // 显示轨迹视图
+          return TrackDisplayWidget(
+            rescueId: rescueProvider.currentRescue?.id ?? '',
+            userId: rescueProvider.getCurrentUserId(),
+            trackPoints: _trackPoints,
+            showDetails: true,
+          );
+        } else {
+          // 显示地图视图
+          return RescueMapWidget(
+            trackPoints: _trackPoints,
+            allUserTracks: trackSharingProvider.allUserTracks,
+            currentUserId: rescueProvider.getCurrentUserId(),
+            showTrack: true,
+            showCurrentLocation: true,
+            onMapTap: (location) {
+              // 处理地图点击
+              debugPrint('地图点击: ${location.latitude}, ${location.longitude}');
+            },
+          );
+        }
+      },
+    );
   }
 
   /// 构建顶部信息面板
@@ -442,6 +456,9 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                 // 开始/停止记录按钮
                 _buildTrackingButton(locationProvider, rescueProvider),
 
+                // 轨迹共享按钮
+                _buildTrackSharingButton(),
+
                 // 标记位置按钮
                 _buildMarkLocationButton(locationProvider),
 
@@ -467,7 +484,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             mini: true,
             heroTag: "zoom_in",
             onPressed: () {
-              // TODO: 实现地图缩放
+              // 地图放大
+              _zoomIn();
             },
             backgroundColor: Colors.white,
             child: const Icon(Icons.zoom_in, color: Colors.black87),
@@ -479,7 +497,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             mini: true,
             heroTag: "zoom_out",
             onPressed: () {
-              // TODO: 实现地图缩放
+              // 地图缩小
+              _zoomOut();
             },
             backgroundColor: Colors.white,
             child: const Icon(Icons.zoom_out, color: Colors.black87),
@@ -492,7 +511,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             mini: true,
             heroTag: "my_location",
             onPressed: () {
-              // TODO: 实现定位到当前位置
+              // 定位到当前位置
+              _moveToCurrentLocation();
             },
             backgroundColor: Colors.blue,
             child: const Icon(Icons.my_location, color: Colors.white),
@@ -576,6 +596,46 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     );
   }
 
+  /// 构建轨迹共享按钮
+  Widget _buildTrackSharingButton() {
+    return Consumer<TrackSharingProvider>(
+      builder: (context, trackSharingProvider, child) {
+        return FloatingActionButton(
+          mini: true,
+          heroTag: "track_sharing",
+          onPressed: trackSharingProvider.isSyncing
+              ? null
+              : () async {
+                  await trackSharingProvider.syncTracks();
+
+                  if (mounted) {
+                    final participantCount =
+                        trackSharingProvider.participantCount;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('轨迹同步完成，共 $participantCount 个参与者'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+          backgroundColor:
+              trackSharingProvider.isSyncing ? Colors.grey : Colors.purple,
+          child: trackSharingProvider.isSyncing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.share_location, color: Colors.white),
+        );
+      },
+    );
+  }
+
   /// 切换信息面板显示
   void _toggleInfoPanel() {
     setState(() {
@@ -644,6 +704,30 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
           behavior: SnackBarBehavior.floating,
         ),
       );
+    }
+  }
+
+  /// 地图放大
+  void _zoomIn() {
+    // 通过地图组件的key来控制缩放
+    // 这里简化处理，实际应该通过MapController
+    debugPrint('地图放大');
+  }
+
+  /// 地图缩小
+  void _zoomOut() {
+    // 通过地图组件的key来控制缩放
+    // 这里简化处理，实际应该通过MapController
+    debugPrint('地图缩小');
+  }
+
+  /// 移动到当前位置
+  void _moveToCurrentLocation() {
+    final locationProvider = context.read<LocationProvider>();
+    if (locationProvider.currentPosition != null) {
+      // 通过地图组件的key来控制移动
+      // 这里简化处理，实际应该通过MapController
+      debugPrint('移动到当前位置: ${locationProvider.currentPosition}');
     }
   }
 }

@@ -1,26 +1,26 @@
 /// 救援数据模型
-/// 
+///
 /// 用于表示一个救援任务的基本信息
 /// 包含救援ID、描述、位置、海拔、创建时间等信息
 class RescueModel {
   /// 救援ID - 随机4位数字
   final String id;
-  
+
   /// 救援描述
   final String description;
-  
+
   /// 救援地点经纬度
   final LocationCoordinate location;
-  
+
   /// 救援地点海拔（米）
   final double altitude;
-  
+
   /// 创建时间
   final DateTime createdAt;
-  
+
   /// 创建者ID
   final String createdBy;
-  
+
   /// 是否激活状态
   final bool isActive;
 
@@ -39,9 +39,12 @@ class RescueModel {
     return RescueModel(
       id: json['id'] as String,
       description: json['description'] as String,
-      location: LocationCoordinate.fromJson(json['location'] as Map<String, dynamic>),
+      location:
+          LocationCoordinate.fromJson(json['location'] as Map<String, dynamic>),
       altitude: (json['altitude'] as num).toDouble(),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      // createAt:  "createdAt": { "_seconds": 1755072629, "_nanoseconds": 950000000  }
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+          json['createdAt']['_seconds'] * 1000),
       createdBy: json['createdBy'] as String,
       isActive: json['isActive'] as bool? ?? true,
     );
@@ -97,12 +100,12 @@ class RescueModel {
 }
 
 /// 位置坐标模型
-/// 
+///
 /// 用于表示经纬度坐标信息
 class LocationCoordinate {
   /// 纬度
   final double latitude;
-  
+
   /// 经度
   final double longitude;
 

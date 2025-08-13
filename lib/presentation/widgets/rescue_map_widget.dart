@@ -23,8 +23,14 @@ class RescueMapWidget extends StatefulWidget {
   /// 是否显示轨迹
   final bool showTrack;
 
-  /// 轨迹点列表
+  /// 当前用户轨迹点列表
   final List<TrackPointModel> trackPoints;
+
+  /// 所有用户轨迹数据 Map<userId, List<TrackPointModel>>
+  final Map<String, List<TrackPointModel>> allUserTracks;
+
+  /// 当前用户ID
+  final String? currentUserId;
 
   /// 地图点击回调
   final Function(LatLng)? onMapTap;
@@ -36,6 +42,8 @@ class RescueMapWidget extends StatefulWidget {
     this.showCurrentLocation = true,
     this.showTrack = true,
     this.trackPoints = const [],
+    this.allUserTracks = const {},
+    this.currentUserId,
     this.onMapTap,
   });
 
@@ -58,6 +66,198 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
   void dispose() {
     _mapController.dispose();
     super.dispose();
+  }
+
+  /// 构建多用户轨迹线
+  List<Polyline> _buildTrackPolylines() {
+    final polylines = <Polyline>[];
+
+    // 定义不同用户的轨迹颜色
+    final colors = [
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+    ];
+
+    int colorIndex = 0;
+
+    // 添加当前用户轨迹（蓝色，较粗）
+    if (widget.trackPoints.isNotEmpty) {
+      polylines.add(
+        Polyline(
+          points: widget.trackPoints
+              .map((point) => LatLng(
+                    point.latitude / 10000000.0,
+                    point.longitude / 10000000.0,
+                  ))
+              .toList(),
+          strokeWidth: 4.0,
+          color: Colors.blue,
+        ),
+      );
+    }
+
+    // 添加其他用户轨迹
+    for (final entry in widget.allUserTracks.entries) {
+      final userId = entry.key;
+      final trackPoints = entry.value;
+
+      // 跳过当前用户（已经添加过了）
+      if (userId == widget.currentUserId) continue;
+
+      if (trackPoints.isNotEmpty) {
+        final color = colors[colorIndex % colors.length];
+        colorIndex++;
+
+        polylines.add(
+          Polyline(
+            points: trackPoints
+                .map((point) => LatLng(
+                      point.latitude / 10000000.0,
+                      point.longitude / 10000000.0,
+                    ))
+                .toList(),
+            strokeWidth: 3.0,
+            color: color,
+          ),
+        );
+      }
+    }
+
+    return polylines;
+  }
+
+  /// 构建用户轨迹标记
+  List<Marker> _buildUserTrackMarkers() {
+    final markers = <Marker>[];
+
+    // 定义不同用户的标记颜色
+    final colors = [
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+    ];
+
+    int colorIndex = 0;
+
+    // 为每个用户添加起点和终点标记
+    for (final entry in widget.allUserTracks.entries) {
+      final userId = entry.key;
+      final trackPoints = entry.value;
+
+      if (trackPoints.isEmpty) continue;
+
+      final color = userId == widget.currentUserId
+          ? Colors.blue
+          : colors[colorIndex % colors.length];
+
+      if (userId != widget.currentUserId) {
+        colorIndex++;
+      }
+
+      // 起点标记
+      final startPoint = trackPoints.first;
+      markers.add(
+        Marker(
+          point: LatLng(
+            startPoint.latitude / 10000000.0,
+            startPoint.longitude / 10000000.0,
+          ),
+          width: 24,
+          height: 24,
+          child: Container(
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Icon(
+              Icons.play_arrow,
+              color: Colors.white,
+              size: 12,
+            ),
+          ),
+        ),
+      );
+
+      // 终点标记（如果不是起点）
+      if (trackPoints.length > 1) {
+        final endPoint = trackPoints.last;
+        markers.add(
+          Marker(
+            point: LatLng(
+              endPoint.latitude / 10000000.0,
+              endPoint.longitude / 10000000.0,
+            ),
+            width: 24,
+            height: 24,
+            child: Container(
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.8),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Icon(
+                Icons.stop,
+                color: Colors.white,
+                size: 12,
+              ),
+            ),
+          ),
+        );
+      }
+
+      // 当前位置标记（最后一个点）
+      if (trackPoints.isNotEmpty) {
+        final lastPoint = trackPoints.last;
+        markers.add(
+          Marker(
+            point: LatLng(
+              lastPoint.latitude / 10000000.0,
+              lastPoint.longitude / 10000000.0,
+            ),
+            width: 20,
+            height: 20,
+            child: Container(
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  userId.substring(0, 1).toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return markers;
   }
 
   @override
@@ -94,20 +294,9 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
             ),
 
             // 轨迹线层
-            if (widget.showTrack && widget.trackPoints.isNotEmpty)
+            if (widget.showTrack)
               PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: widget.trackPoints
-                        .map((point) => LatLng(
-                              point.latitude / 10000000.0, // 转换为double
-                              point.longitude / 10000000.0, // 转换为double
-                            ))
-                        .toList(),
-                    strokeWidth: 4.0,
-                    color: Colors.blue,
-                  ),
-                ],
+                polylines: _buildTrackPolylines(),
               ),
 
             // 标记层
@@ -190,61 +379,9 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
       );
     }
 
-    // 轨迹点标记（仅显示关键点）
-    if (widget.showTrack && widget.trackPoints.isNotEmpty) {
-      // 显示起点
-      if (widget.trackPoints.isNotEmpty) {
-        final startPoint = widget.trackPoints.first;
-        markers.add(
-          Marker(
-            point: LatLng(
-              startPoint.latitude / 10000000.0,
-              startPoint.longitude / 10000000.0,
-            ),
-            width: 30,
-            height: 30,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-        );
-      }
-
-      // 显示终点（如果不是起点）
-      if (widget.trackPoints.length > 1) {
-        final endPoint = widget.trackPoints.last;
-        markers.add(
-          Marker(
-            point: LatLng(
-              endPoint.latitude / 10000000.0,
-              endPoint.longitude / 10000000.0,
-            ),
-            width: 30,
-            height: 30,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.orange,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(
-                Icons.stop,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-        );
-      }
+    // 多用户轨迹标记
+    if (widget.showTrack) {
+      markers.addAll(_buildUserTrackMarkers());
     }
 
     return markers;

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'core/providers/rescue_provider.dart';
 import 'core/providers/location_provider.dart';
 import 'core/providers/sync_provider.dart';
+import 'core/providers/track_sharing_provider.dart';
 import 'core/services/database_service.dart';
 import 'core/services/background_location_service.dart';
 import 'presentation/pages/home_page.dart';
@@ -39,6 +40,7 @@ class RescueApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RescueProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => SyncProvider()),
+        ChangeNotifierProvider(create: (_) => TrackSharingProvider()),
       ],
       child: MaterialApp(
         title: '救援APP',
