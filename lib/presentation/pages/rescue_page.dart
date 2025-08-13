@@ -107,7 +107,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
         // 从本地缓存加载轨迹点
         final trackPoints = await BackgroundLocationService.getLocalTrackPoints(
           rescueProvider.currentRescue!.id,
-          'current_user', // TODO: 从用户服务获取
+          rescueProvider.getCurrentUserId(),
         );
 
         if (mounted) {
@@ -139,7 +139,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             child: Stack(
               children: [
                 // 地图背景
-                _buildMapBackground(),
+                _buildMapBackground(rescueProvider),
 
                 // 顶部信息面板
                 _buildTopInfoPanel(rescue),
@@ -204,12 +204,12 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   }
 
   /// 构建地图背景
-  Widget _buildMapBackground() {
+  Widget _buildMapBackground(rescueProvider) {
     if (_showTrackView) {
       // 显示轨迹视图
       return TrackDisplayWidget(
-        rescueId: context.read<RescueProvider>().currentRescue?.id ?? '',
-        userId: 'current_user', // TODO: 从用户服务获取
+        rescueId: rescueProvider.currentRescue?.id ?? '',
+        userId: rescueProvider.getCurrentUserId(), // TODO: 从用户服务获取
         trackPoints: _trackPoints,
         showDetails: true,
       );
