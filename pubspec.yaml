@@ -56,9 +56,9 @@ dependencies:
   path: ^1.9.0
 
   # 后台服务 - 暂时移除，避免编译问题
-  # workmanager: ^0.5.2
-  # flutter_background_service: ^5.0.10
-  flutter_foreground_task: ^9.1.0
+  # workmanager: ^0.9.0+2
+  flutter_background_service: ^5.1.0
+  # flutter_foreground_task: ^9.1.0
 
   # 权限管理
   permission_handler: ^11.3.1
