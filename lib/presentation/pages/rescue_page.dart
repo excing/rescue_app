@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rescue_app/presentation/pages/home_page.dart';
 
 import '../../core/providers/rescue_provider.dart';
 import '../../core/providers/location_provider.dart';
@@ -108,11 +109,10 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                 _buildMapBackground(),
 
                 // 顶部信息面板
-                if (_showInfoPanel)
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: _buildTopInfoPanel(rescue),
-                  ),
+                _buildTopInfoPanel(rescue),
+
+                if (!_showInfoPanel) // 显示导航按钮
+                  _buildNavigationButton(),
 
                 // 左侧位置信息面板
                 _buildLocationInfoPanel(),
@@ -223,94 +223,120 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
       top: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 8,
-          left: 16,
-          right: 16,
-          bottom: 16,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withOpacity(0.7),
-              Colors.transparent,
-            ],
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Container(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            right: 16,
+            bottom: 16,
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 救援标题行
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(
-                    Icons.arrow_back_ios,
-                    color: Colors.white,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    '救援 ${rescue.id}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.7),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 救援标题行
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => const HomePage(),
+                        ),
+                      )
+                    },
+                    icon: const Icon(
+                      Icons.arrow_back_ios,
                       color: Colors.white,
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: _toggleInfoPanel,
-                  icon: Icon(
-                    _showInfoPanel
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-
-            // 救援描述
-            Text(
-              rescue.description,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white70,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // 同步状态
-            Consumer<SyncProvider>(
-              builder: (context, syncProvider, child) {
-                return Row(
-                  children: [
-                    Icon(
-                      syncProvider.isSyncing ? Icons.sync : Icons.sync_disabled,
-                      color: syncProvider.isSyncing
-                          ? Colors.green
-                          : Colors.white70,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      syncProvider.syncStatusDescription,
+                  Expanded(
+                    child: Text(
+                      '救援 ${rescue.id}',
                       style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
-                );
-              },
-            ),
-          ],
+                  ),
+                  IconButton(
+                    onPressed: _toggleInfoPanel,
+                    icon: Icon(
+                      _showInfoPanel
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+
+              // 救援描述
+              Text(
+                rescue.description,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white70,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // 同步状态
+              Consumer<SyncProvider>(
+                builder: (context, syncProvider, child) {
+                  return Row(
+                    children: [
+                      Icon(
+                        syncProvider.isSyncing
+                            ? Icons.sync
+                            : Icons.sync_disabled,
+                        color: syncProvider.isSyncing
+                            ? Colors.green
+                            : Colors.white70,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        syncProvider.syncStatusDescription,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 显示顶部信息面板按钮
+  Widget _buildNavigationButton() {
+    return Positioned(
+      top: 38,
+      right: 16,
+      child: IconButton(
+        onPressed: _toggleInfoPanel,
+        icon: Icon(
+          _showInfoPanel ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+          color: Colors.white,
         ),
       ),
     );
