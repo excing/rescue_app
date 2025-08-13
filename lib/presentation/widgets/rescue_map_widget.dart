@@ -134,8 +134,8 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
             locationProvider.currentPosition!.latitude,
             locationProvider.currentPosition!.longitude,
           ),
-          width: 40,
-          height: 40,
+          width: 30,
+          height: 30,
           child: Container(
             decoration: BoxDecoration(
               color: Colors.blue,
@@ -152,7 +152,7 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
             child: const Icon(
               Icons.my_location,
               color: Colors.white,
-              size: 20,
+              size: 15,
             ),
           ),
         ),
@@ -161,12 +161,12 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
 
     // 救援位置标记
     final rescue = rescueProvider.currentRescue;
-    if (rescue != null && rescue.location != null) {
+    if (rescue != null) {
       markers.add(
         Marker(
-          point: LatLng(rescue.location!.latitude, rescue.location!.longitude),
-          width: 50,
-          height: 50,
+          point: LatLng(rescue.location.latitude, rescue.location.longitude),
+          width: 30,
+          height: 30,
           child: Container(
             decoration: BoxDecoration(
               color: Colors.red,
@@ -183,7 +183,7 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
             child: const Icon(
               Icons.emergency,
               color: Colors.white,
-              size: 25,
+              size: 15,
             ),
           ),
         ),
