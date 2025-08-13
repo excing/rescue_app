@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../core/services/background_location_service.dart';
 
 /// 后台服务测试页面
-/// 
+///
 /// 用于测试后台位置服务的功能
 /// 包含启动、停止、状态检查等功能
 class TestBackgroundPage extends StatefulWidget {
@@ -18,7 +19,7 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
   bool _isTracking = false;
   bool _isServiceRunning = false;
   String _lastLocationUpdate = '暂无位置更新';
-  
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +32,7 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
     final isTracking = await BackgroundLocationService.isTracking();
     final service = FlutterBackgroundService();
     final isRunning = await service.isRunning();
-    
+    debugPrint('服务状态: isTracking=$isTracking, isRunning=$isRunning');
     setState(() {
       _isTracking = isTracking;
       _isServiceRunning = isRunning;
@@ -47,11 +48,12 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
         final lat = data['latitude'] as double?;
         final lng = data['longitude'] as double?;
         final timestamp = data['timestamp'] as int?;
-        
+
         if (lat != null && lng != null && timestamp != null) {
           final time = DateTime.fromMillisecondsSinceEpoch(timestamp);
           setState(() {
-            _lastLocationUpdate = '位置: ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}\n时间: ${time.toString()}';
+            _lastLocationUpdate =
+                '位置: ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}\n时间: ${time.toString()}';
           });
         }
       }
@@ -73,19 +75,19 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
           children: [
             // 服务状态卡片
             _buildStatusCard(),
-            
+
             const SizedBox(height: 16),
-            
+
             // 位置更新卡片
             _buildLocationCard(),
-            
+
             const SizedBox(height: 24),
-            
+
             // 控制按钮
             _buildControlButtons(),
-            
+
             const SizedBox(height: 16),
-            
+
             // 刷新按钮
             ElevatedButton.icon(
               onPressed: _checkServiceStatus,
@@ -202,37 +204,71 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
   }
 
   /// 开始追踪
+  @pragma('vm:entry-point')
   Future<void> _startTracking() async {
     try {
+      // 首先检查位置权限
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        final newPermission = await Geolocator.requestPermission();
+        if (newPermission == LocationPermission.denied ||
+            newPermission == LocationPermission.deniedForever) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('需要位置权限才能启动后台追踪'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       // 使用测试数据
       const testRescueId = '1234';
       const testUserId = 'test_user_001';
-      
-      final success = await BackgroundLocationService.startTracking(testRescueId, testUserId);
-      
-      if (success) {
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('后台位置追踪已启动'),
-            backgroundColor: Colors.green,
+            content: Text('正在启动后台位置追踪...'),
+            backgroundColor: Colors.blue,
           ),
         );
-        await _checkServiceStatus();
-      } else {
+      }
+
+      final success = await BackgroundLocationService.startTracking(
+          testRescueId, testUserId);
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('后台位置追踪已启动'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await _checkServiceStatus();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('启动后台位置追踪失败'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('启动追踪异常: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('启动后台位置追踪失败'),
+          SnackBar(
+            content: Text('启动失败: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('启动失败: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -240,26 +276,31 @@ class _TestBackgroundPageState extends State<TestBackgroundPage> {
   Future<void> _stopTracking() async {
     try {
       await BackgroundLocationService.stopTracking();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('后台位置追踪已停止'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      
-      await _checkServiceStatus();
-      
-      setState(() {
-        _lastLocationUpdate = '暂无位置更新';
-      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('后台位置追踪已停止'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+
+        await _checkServiceStatus();
+
+        setState(() {
+          _lastLocationUpdate = '暂无位置更新';
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('停止失败: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('停止追踪异常: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('停止失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

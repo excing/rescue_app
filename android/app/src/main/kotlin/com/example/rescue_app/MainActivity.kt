@@ -1,4 +1,4 @@
-package com.example.rescue_app
+package com.blendiv.rescue_app
 
 import io.flutter.embedding.android.FlutterActivity
 

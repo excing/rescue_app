@@ -40,7 +40,7 @@ dependencies:
   latlong2: ^0.9.1
 
   # GPS定位
-  geolocator: ^12.0.0
+  geolocator: ^14.0.2
   location: ^6.0.2
 
   # HTTP请求
@@ -59,6 +59,9 @@ dependencies:
   # workmanager: ^0.9.0+2
   flutter_background_service: ^5.1.0
   # flutter_foreground_task: ^9.1.0
+
+  #通知服务
+  flutter_local_notifications: ^19.4.0
 
   # 权限管理
   permission_handler: ^11.3.1

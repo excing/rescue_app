@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,58 +13,109 @@ import 'database_service.dart';
 ///
 /// 使用 flutter_background_service 实现后台位置追踪
 /// 支持在应用后台、锁屏状态下持续记录位置轨迹
+@pragma('vm:entry-point')
 class BackgroundLocationService {
+  static const String notificationChannelId = 'rescue_tracking_channel';
+  static const String notificationChannelTitle = '救援轨迹记录';
+  static const String notificationChannelDescription = '准备开始记录位置轨迹';
+
   static const String _serviceKey = 'background_location_service';
   static const String _rescueIdKey = 'current_rescue_id';
   static const String _userIdKey = 'current_user_id';
   static const String _isTrackingKey = 'is_tracking';
 
+  // 定位设置
+  static const LocationSettings _locationSettings = LocationSettings(
+    accuracy: LocationAccuracy.high,
+    distanceFilter: 3, // 3米距离过滤，提高精度
+    timeLimit: Duration(seconds: 30),
+  );
+
   /// 初始化后台服务
   static Future<void> initializeService() async {
-    final service = FlutterBackgroundService();
+    try {
+      final service = FlutterBackgroundService();
 
-    // 配置后台服务
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: false,
-        isForegroundMode: true,
-        notificationChannelId: 'rescue_tracking_channel',
-        initialNotificationTitle: '救援轨迹记录',
-        initialNotificationContent: '准备开始记录位置轨迹',
-        foregroundServiceNotificationId: 888,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: false,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        notificationChannelId, // id
+        notificationChannelTitle, // title
+        description: notificationChannelDescription, // description
+        importance: Importance.low, // importance must be at low or higher level
+      );
+
+      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+          FlutterLocalNotificationsPlugin();
+
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+
+      // 配置后台服务
+      await service.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: onStart,
+          autoStart: false,
+          isForegroundMode: true,
+          notificationChannelId: notificationChannelId,
+          initialNotificationTitle: notificationChannelTitle,
+          initialNotificationContent: notificationChannelDescription,
+          foregroundServiceNotificationId: 888,
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: false,
+          onForeground: onStart,
+          onBackground: onIosBackground,
+        ),
+      );
+      debugPrint('后台服务初始化成功');
+    } catch (e) {
+      debugPrint('后台服务初始化失败: $e');
+    }
   }
 
   /// 开始后台位置追踪
   static Future<bool> startTracking(String rescueId, String userId) async {
     try {
+      debugPrint('开始启动后台位置追踪: rescueId=$rescueId, userId=$userId');
+
+      // 检查位置权限
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        debugPrint('位置权限不足，无法启动后台追踪');
+        return false;
+      }
+
       // 保存追踪参数到本地存储
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_rescueIdKey, rescueId);
       await prefs.setString(_userIdKey, userId);
       await prefs.setBool(_isTrackingKey, true);
+      debugPrint('追踪参数已保存到本地存储');
 
       // 启动后台服务
       final service = FlutterBackgroundService();
       final isRunning = await service.isRunning();
+      debugPrint('后台服务运行状态: $isRunning');
 
       if (!isRunning) {
-        await service.startService();
+        debugPrint('启动后台服务...');
+        final success = await service.startService();
+        debugPrint('后台服务启动结果: $success');
+
+        // 等待服务启动
+        await Future.delayed(const Duration(seconds: 2));
       }
 
       // 发送开始追踪命令
+      debugPrint('发送开始追踪命令...');
       service.invoke('start_tracking', {
         'rescue_id': rescueId,
         'user_id': userId,
       });
 
+      debugPrint('后台位置追踪启动成功');
       return true;
     } catch (e) {
       debugPrint('启动后台位置追踪失败: $e');
@@ -194,9 +246,7 @@ class BackgroundLocationService {
 
         // 获取当前位置
         final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 15),
-        );
+            locationSettings: _locationSettings);
 
         // 创建轨迹点
         final trackPoint = TrackPointModel.fromDouble(

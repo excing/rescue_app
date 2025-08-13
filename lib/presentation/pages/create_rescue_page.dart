@@ -31,6 +31,8 @@ class _CreateRescuePageState extends State<CreateRescuePage>
   bool _isCreating = false;
   bool _hasLocation = false;
 
+  bool canCreate = false;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +68,8 @@ class _CreateRescuePageState extends State<CreateRescuePage>
     _fadeController.forward();
     _slideController.forward();
 
+    _descriptionController.addListener(_onTextChanged);
+
     // 生成救援号
     _generateRescueId();
 
@@ -73,8 +77,17 @@ class _CreateRescuePageState extends State<CreateRescuePage>
     _getCurrentLocation();
   }
 
+  void _onTextChanged() {
+    setState(() {
+      canCreate = _descriptionController.text.trim().isNotEmpty &&
+          _hasLocation &&
+          !_isCreating;
+    });
+  }
+
   @override
   void dispose() {
+    _descriptionController.removeListener(_onTextChanged);
     _descriptionController.dispose();
     _descriptionFocusNode.dispose();
     _fadeController.dispose();
@@ -501,10 +514,6 @@ class _CreateRescuePageState extends State<CreateRescuePage>
   Widget _buildCreateButton() {
     return Consumer2<RescueProvider, LocationProvider>(
       builder: (context, rescueProvider, locationProvider, child) {
-        final canCreate = _descriptionController.text.trim().isNotEmpty &&
-            _hasLocation &&
-            !_isCreating;
-
         return SizedBox(
           width: double.infinity,
           height: 56,

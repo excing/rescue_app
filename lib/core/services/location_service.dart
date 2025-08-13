@@ -32,7 +32,7 @@ class LocationService {
   static const LocationSettings _locationSettings = LocationSettings(
     accuracy: LocationAccuracy.high,
     distanceFilter: 3, // 3米距离过滤，提高精度
-    timeLimit: Duration(seconds: 15),
+    timeLimit: Duration(seconds: 30),
   );
 
   // Getters
@@ -46,16 +46,25 @@ class LocationService {
       if (_isInitialized) return true;
 
       // 检查位置服务是否启用
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        debugPrint('位置服务未启用');
-        return false;
+        debugPrint('位置服务未启用，尝试打开设置');
+        serviceEnabled = await Geolocator.openLocationSettings();
+        if (!serviceEnabled) {
+          debugPrint('位置服务仍未启用');
+          return false;
+        }
       }
 
       // 检查位置权限
       LocationPermission permission = await Geolocator.checkPermission();
+      debugPrint('当前位置权限状态: $permission');
+
       if (permission == LocationPermission.denied) {
+        debugPrint('请求位置权限...');
         permission = await Geolocator.requestPermission();
+        debugPrint('权限请求结果: $permission');
+
         if (permission == LocationPermission.denied) {
           debugPrint('位置权限被拒绝');
           return false;
@@ -63,8 +72,21 @@ class LocationService {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('位置权限被永久拒绝');
+        debugPrint('位置权限被永久拒绝，需要手动在设置中开启');
+        await Geolocator.openAppSettings();
         return false;
+      }
+
+      // 测试获取位置
+      try {
+        debugPrint('测试获取当前位置...');
+        Position position = await Geolocator.getCurrentPosition(
+            locationSettings: _locationSettings);
+        debugPrint('位置获取成功: ${position.latitude}, ${position.longitude}');
+      } catch (e) {
+        debugPrint('位置获取测试失败: $e');
+        // 不要因为测试失败就返回false，可能是暂时的网络问题
+        debugPrint('继续初始化，稍后重试位置获取');
       }
 
       _isInitialized = true;
@@ -145,13 +167,14 @@ class LocationService {
   /// 获取当前位置
   Future<Position?> getCurrentPosition() async {
     try {
-      if (!_isInitialized) return null;
+      if (!_isInitialized) {
+        await initialize();
+      }
 
-      // 无法获取当前位置
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: _locationSettings,
       );
+      debugPrint('获取当前位置成功: ${position.latitude}, ${position.longitude}');
 
       _lastPosition = position;
       return position;

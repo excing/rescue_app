@@ -172,49 +172,56 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             opacity: _fadeAnimation,
             child: SlideTransition(
               position: _slideAnimation,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 顶部间距
-                    const SizedBox(height: 20),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height -
+                        MediaQuery.of(context).padding.top -
+                        MediaQuery.of(context).padding.bottom -
+                        32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 顶部间距
+                      const SizedBox(height: 16),
 
-                    // 应用标题
-                    _buildAppTitle(),
+                      // 应用标题
+                      _buildAppTitle(),
 
-                    // 主要内容区域
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // 救援输入卡片
-                          RescueInputCard(
-                            onJoinRescue: _handleJoinRescue,
-                            onCreateRescue: _handleCreateRescue,
-                          ),
+                      const SizedBox(height: 24),
 
-                          const SizedBox(height: 32),
-
-                          // 最近救援列表
-                          Expanded(
-                            child: RecentRescuesList(
-                              onRescueSelected: _handleRescueSelected,
-                            ),
-                          ),
-                        ],
+                      // 救援输入卡片
+                      RescueInputCard(
+                        onJoinRescue: _handleJoinRescue,
+                        onCreateRescue: _handleCreateRescue,
                       ),
-                    ),
 
-                    // 底部版本信息和调试按钮
-                    _buildVersionInfo(),
+                      const SizedBox(height: 16),
 
-                    // 调试按钮（仅在调试模式下显示）
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 8),
-                      _buildDebugButton(),
+                      // 最近救援列表
+                      SizedBox(
+                        height: 280,
+                        child: RecentRescuesList(
+                          onRescueSelected: _handleRescueSelected,
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 底部版本信息和调试按钮
+                      _buildVersionInfo(),
+
+                      // 调试按钮（仅在调试模式下显示）
+                      if (kDebugMode) ...[
+                        const SizedBox(height: 8),
+                        _buildDebugButton(),
+                      ],
+
+                      const SizedBox(height: 16),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
