@@ -128,7 +128,7 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
         );
       }
     }
-
+    debugPrint('构建轨迹线完成，共 ${polylines.length} 条线');
     return polylines;
   }
 

@@ -76,67 +76,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final locationProvider = context.read<LocationProvider>();
     final rescueProvider = context.read<RescueProvider>();
 
-    // 检查权限
-    await _checkPermissions();
-
     // 初始化位置服务
     await locationProvider.initialize();
 
     // 加载最近救援列表
     await rescueProvider.loadRecentRescues();
-  }
-
-  /// 检查权限
-  Future<void> _checkPermissions() async {
-    final permissionService = PermissionService.instance;
-
-    // 检查基础位置权限
-    final hasLocationPermission =
-        await permissionService.hasLocationPermission();
-
-    if (!hasLocationPermission) {
-      // 显示权限引导
-      _showPermissionGuide();
-    }
-  }
-
-  /// 显示权限引导
-  void _showPermissionGuide() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.orange),
-                SizedBox(width: 8),
-                Text('需要位置权限'),
-              ],
-            ),
-            content: const Text(
-              '救援APP需要位置权限来记录和共享您的位置轨迹。请前往权限设置页面进行授权。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('稍后'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _navigateToPermissionPage();
-                },
-                child: const Text('去设置'),
-              ),
-            ],
-          ),
-        );
-      }
-    });
   }
 
   /// 导航到权限页面
@@ -153,6 +97,33 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
+  }
+
+  /// 检查权限，如果未授权则导航到权限页面
+  Future<bool> _checkAndRequestPermissions() async {
+    final permissionService = PermissionService.instance;
+    final hasPermission = await permissionService.hasLocationPermission();
+
+    if (hasPermission) {
+      return true;
+    }
+
+    if (!mounted) return false;
+
+    // 导航到权限页面并等待返回
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const PermissionPage()),
+    );
+
+    // 再次检查权限
+    final hasPermissionNow = await permissionService.hasLocationPermission();
+    if (!hasPermissionNow) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, '需要位置权限才能继续操作');
+      }
+      return false;
+    }
+    return true;
   }
 
   @override
@@ -320,6 +291,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   /// 处理加入救援
   Future<void> _handleJoinRescue(String rescueId) async {
+    final hasPermission = await _checkAndRequestPermissions();
+    if (!hasPermission) return;
+
     final rescueProvider = context.read<RescueProvider>();
 
     // 显示加载对话框
@@ -355,6 +329,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   /// 处理创建救援
   Future<void> _handleCreateRescue() async {
+    final hasPermission = await _checkAndRequestPermissions();
+    if (!hasPermission) return;
+
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => const CreateRescuePage(),
