@@ -25,7 +25,12 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+
+  // Animations for UI panels
+  late Animation<Offset> _topPanelAnimation;
+  late Animation<Offset> _bottomPanelAnimation;
+  late Animation<Offset> _leftPanelAnimation;
+  late Animation<Offset> _rightPanelAnimation;
 
   bool _showInfoPanel = true;
   bool _isTracking = false;
@@ -35,17 +40,11 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    // 初始化动画
+    // General fade-in animation for the page
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -54,19 +53,46 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
       curve: Curves.easeInOut,
     ));
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
+    // Controller for UI panel animations
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    final curvedAnimation = CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeOutCubic,
-    ));
+    );
 
-    // 启动动画
+    // Top panel animation (slides up to hide)
+    _topPanelAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.5),
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    // Bottom panel animation (slides down to hide)
+    _bottomPanelAnimation = Tween<Offset>(
+      begin: const Offset(0, 1.5),
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    // Left panel animation (slides left to hide)
+    _leftPanelAnimation = Tween<Offset>(
+      begin: const Offset(-1.5, 0),
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    // Right panel animation (slides right to hide)
+    _rightPanelAnimation = Tween<Offset>(
+      begin: const Offset(1.5, 0),
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    // Start animations
     _fadeController.forward();
     _slideController.forward();
 
-    // 初始化服务
+    // Initialize services
     _initializeServices();
 
     // 加载轨迹数据
@@ -150,9 +176,6 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                 // 顶部信息面板
                 _buildTopInfoPanel(rescue),
 
-                if (!_showInfoPanel) // 显示导航按钮
-                  _buildNavigationButton(),
-
                 // 左侧位置信息面板
                 _buildLocationInfoPanel(),
 
@@ -160,7 +183,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                 _buildBottomControlPanel(),
 
                 // 右侧功能按钮
-                // r_buildSideActionButtons(),
+                _buildSideActionButtons(),
               ],
             ),
           );
@@ -236,7 +259,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
       left: 0,
       right: 0,
       child: SlideTransition(
-        position: _slideAnimation,
+        position: _topPanelAnimation,
         child: Container(
           padding: EdgeInsets.only(
             top: MediaQuery.of(context).padding.top + 8,
@@ -249,7 +272,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0.7),
+                Colors.black.withOpacity(0.7),
                 Colors.transparent,
               ],
             ),
@@ -339,73 +362,61 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     );
   }
 
-  /// 显示顶部信息面板按钮
-  Widget _buildNavigationButton() {
-    return Positioned(
-      top: 38,
-      right: 16,
-      child: IconButton(
-        onPressed: _toggleInfoPanel,
-        icon: Icon(
-          _showInfoPanel ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
   /// 构建位置信息面板
   Widget _buildLocationInfoPanel() {
     return Positioned(
       left: 16,
       top: 200,
-      child: Consumer<LocationProvider>(
-        builder: (context, locationProvider, child) {
-          return Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '当前位置',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+      child: SlideTransition(
+        position: _leftPanelAnimation,
+        child: Consumer<LocationProvider>(
+          builder: (context, locationProvider, child) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '当前位置',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  locationProvider.currentLocationString,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white70,
+                  const SizedBox(height: 8),
+                  Text(
+                    locationProvider.currentLocationString,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  locationProvider.currentAltitudeString,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white70,
+                  const SizedBox(height: 4),
+                  Text(
+                    locationProvider.currentAltitudeString,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  locationProvider.currentAccuracyString,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.white70,
+                  const SizedBox(height: 4),
+                  Text(
+                    locationProvider.currentAccuracyString,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -416,39 +427,42 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          bottom: MediaQuery.of(context).padding.bottom + 16,
-          top: 16,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              Colors.black.withOpacity(0.8),
-              Colors.transparent,
-            ],
+      child: SlideTransition(
+        position: _bottomPanelAnimation,
+        child: Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            top: 16,
           ),
-        ),
-        child: Consumer2<LocationProvider, RescueProvider>(
-          builder: (context, locationProvider, rescueProvider, child) {
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // 开始/停止记录按钮
-                _buildTrackingButton(locationProvider, rescueProvider),
-
-                // 标记位置按钮
-                _buildMarkLocationButton(locationProvider),
-
-                // 同步按钮
-                _buildSyncButton(),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withOpacity(0.8),
+                Colors.transparent,
               ],
-            );
-          },
+            ),
+          ),
+          child: Consumer2<LocationProvider, RescueProvider>(
+            builder: (context, locationProvider, rescueProvider, child) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // 开始/停止记录按钮
+                  _buildTrackingButton(locationProvider, rescueProvider),
+
+                  // 标记位置按钮
+                  _buildMarkLocationButton(locationProvider),
+
+                  // 同步按钮
+                  _buildSyncButton(),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -459,47 +473,50 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     return Positioned(
       right: 16,
       top: 200,
-      child: Column(
-        children: [
-          // 缩放按钮
-          FloatingActionButton(
-            mini: true,
-            heroTag: "zoom_in",
-            onPressed: () {
-              // 地图放大
-              _zoomIn();
-            },
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.zoom_in, color: Colors.black87),
-          ),
+      child: SlideTransition(
+        position: _rightPanelAnimation,
+        child: Column(
+          children: [
+            // 缩放按钮
+            FloatingActionButton(
+              mini: true,
+              heroTag: "zoom_in",
+              onPressed: () {
+                // 地图放大
+                _zoomIn();
+              },
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.zoom_in, color: Colors.black87),
+            ),
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          FloatingActionButton(
-            mini: true,
-            heroTag: "zoom_out",
-            onPressed: () {
-              // 地图缩小
-              _zoomOut();
-            },
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.zoom_out, color: Colors.black87),
-          ),
+            FloatingActionButton(
+              mini: true,
+              heroTag: "zoom_out",
+              onPressed: () {
+                // 地图缩小
+                _zoomOut();
+              },
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.zoom_out, color: Colors.black87),
+            ),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // 定位按钮
-          FloatingActionButton(
-            mini: true,
-            heroTag: "my_location",
-            onPressed: () {
-              // 定位到当前位置
-              _moveToCurrentLocation();
-            },
-            backgroundColor: Colors.blue,
-            child: const Icon(Icons.my_location, color: Colors.white),
-          ),
-        ],
+            // 定位按钮
+            FloatingActionButton(
+              mini: true,
+              heroTag: "my_location",
+              onPressed: () {
+                // 定位到当前位置
+                _moveToCurrentLocation();
+              },
+              backgroundColor: Colors.blue,
+              child: const Icon(Icons.my_location, color: Colors.white),
+            ),
+          ],
+        ),
       ),
     );
   }
