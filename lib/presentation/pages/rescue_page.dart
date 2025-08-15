@@ -9,7 +9,6 @@ import '../../core/providers/sync_provider.dart';
 import '../../core/providers/track_sharing_provider.dart';
 import '../../core/services/background_location_service.dart';
 import '../widgets/rescue_map_widget.dart';
-import '../widgets/track_display_widget.dart';
 
 /// 救援页面
 ///
@@ -30,7 +29,6 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   bool _showInfoPanel = true;
   bool _isTracking = false;
-  bool _showTrackView = false;
   List<TrackPointModel> _trackPoints = [];
 
   @override
@@ -162,7 +160,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                 _buildBottomControlPanel(),
 
                 // 右侧功能按钮
-                _buildSideActionButtons(),
+                // r_buildSideActionButtons(),
               ],
             ),
           );
@@ -215,28 +213,18 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   Widget _buildMapBackground(rescueProvider) {
     return Consumer<TrackSharingProvider>(
       builder: (context, trackSharingProvider, child) {
-        if (_showTrackView) {
-          // 显示轨迹视图
-          return TrackDisplayWidget(
-            rescueId: rescueProvider.currentRescue?.id ?? '',
-            userId: rescueProvider.getCurrentUserId(),
-            trackPoints: _trackPoints,
-            showDetails: true,
-          );
-        } else {
-          // 显示地图视图
-          return RescueMapWidget(
-            trackPoints: _trackPoints,
-            allUserTracks: trackSharingProvider.allUserTracks,
-            currentUserId: rescueProvider.getCurrentUserId(),
-            showTrack: true,
-            showCurrentLocation: true,
-            onMapTap: (location) {
-              // 处理地图点击
-              debugPrint('地图点击: ${location.latitude}, ${location.longitude}');
-            },
-          );
-        }
+        return RescueMapWidget(
+          trackPoints: _trackPoints,
+          allUserTracks: trackSharingProvider.allUserTracks,
+          currentUserId: rescueProvider.getCurrentUserId(),
+          showTrack: true,
+          showCurrentLocation: true,
+          onMapTap: (location) {
+            // 处理地图点击
+            debugPrint('地图点击: ${location.latitude}, ${location.longitude}');
+            _toggleInfoPanel();
+          },
+        );
       },
     );
   }
@@ -450,14 +438,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // 视图切换按钮
-                _buildViewToggleButton(),
-
                 // 开始/停止记录按钮
                 _buildTrackingButton(locationProvider, rescueProvider),
-
-                // 轨迹共享按钮
-                _buildTrackSharingButton(),
 
                 // 标记位置按钮
                 _buildMarkLocationButton(locationProvider),
@@ -573,64 +555,6 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                   ),
                 )
               : const Icon(Icons.sync, color: Colors.white),
-        );
-      },
-    );
-  }
-
-  /// 构建视图切换按钮
-  Widget _buildViewToggleButton() {
-    return FloatingActionButton(
-      mini: true,
-      heroTag: "view_toggle",
-      onPressed: () {
-        setState(() {
-          _showTrackView = !_showTrackView;
-        });
-      },
-      backgroundColor: _showTrackView ? Colors.orange : Colors.blue,
-      child: Icon(
-        _showTrackView ? Icons.map : Icons.timeline,
-        color: Colors.white,
-      ),
-    );
-  }
-
-  /// 构建轨迹共享按钮
-  Widget _buildTrackSharingButton() {
-    return Consumer<TrackSharingProvider>(
-      builder: (context, trackSharingProvider, child) {
-        return FloatingActionButton(
-          mini: true,
-          heroTag: "track_sharing",
-          onPressed: trackSharingProvider.isSyncing
-              ? null
-              : () async {
-                  await trackSharingProvider.syncTracks();
-
-                  if (mounted) {
-                    final participantCount =
-                        trackSharingProvider.participantCount;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('轨迹同步完成，共 $participantCount 个参与者'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-          backgroundColor:
-              trackSharingProvider.isSyncing ? Colors.grey : Colors.purple,
-          child: trackSharingProvider.isSyncing
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Icon(Icons.share_location, color: Colors.white),
         );
       },
     );
