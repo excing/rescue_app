@@ -306,15 +306,9 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: _toggleInfoPanel,
-                    icon: Icon(
-                      _showInfoPanel
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      color: Colors.white,
-                    ),
-                  ),
+
+                  // 同步按钮
+                  _buildSyncButton(),
                 ],
               ),
 
@@ -456,9 +450,6 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
                   // 标记位置按钮
                   _buildMarkLocationButton(locationProvider),
-
-                  // 同步按钮
-                  _buildSyncButton(),
                 ],
               );
             },
@@ -558,20 +549,16 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   Widget _buildSyncButton() {
     return Consumer<SyncProvider>(
       builder: (context, syncProvider, child) {
-        return FloatingActionButton(
-          heroTag: "sync",
-          onPressed: syncProvider.canManualSync ? _performSync : null,
-          backgroundColor: syncProvider.isSyncing ? Colors.grey : Colors.blue,
-          child: syncProvider.isSyncing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Icon(Icons.sync, color: Colors.white),
+        return Positioned(
+          top: 38,
+          right: 16,
+          child: IconButton(
+            onPressed: syncProvider.canManualSync ? _performSync : null,
+            icon: Icon(
+              Icons.sync,
+              color: Colors.white,
+            ),
+          ),
         );
       },
     );

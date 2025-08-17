@@ -76,11 +76,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final locationProvider = context.read<LocationProvider>();
     final rescueProvider = context.read<RescueProvider>();
 
-    // 初始化位置服务
-    await locationProvider.initialize();
-
     // 加载最近救援列表
     await rescueProvider.loadRecentRescues();
+
+    // 初始化位置服务
+    await locationProvider.initialize();
   }
 
   /// 导航到权限页面
