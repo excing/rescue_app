@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:rescue_app/presentation/pages/home_page.dart';
 
@@ -22,6 +24,7 @@ class RescuePage extends StatefulWidget {
 }
 
 class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
+  late final MapController _mapController;
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late AnimationController _syncAnimationController;
@@ -39,6 +42,8 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
+    _mapController = MapController();
 
     // General fade-in animation for the page
     _fadeController = AnimationController(
@@ -106,6 +111,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _mapController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     _syncAnimationController.dispose();
@@ -243,6 +249,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     return Consumer<TrackSharingProvider>(
       builder: (context, trackSharingProvider, child) {
         return RescueMapWidget(
+          mapController: _mapController,
           trackPoints: _trackPoints,
           allUserTracks: trackSharingProvider.allUserTracks,
           currentUserId: rescueProvider.getCurrentUserId(),
@@ -467,54 +474,58 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   /// 构建侧边功能按钮
   Widget _buildSideActionButtons() {
-    return Positioned(
-      right: 16,
-      top: 200,
-      child: SlideTransition(
-        position: _rightPanelAnimation,
-        child: Column(
-          children: [
-            // 缩放按钮
-            FloatingActionButton(
-              mini: true,
-              heroTag: "zoom_in",
-              onPressed: () {
-                // 地图放大
-                _zoomIn();
-              },
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.zoom_in, color: Colors.black87),
+    return Consumer2<LocationProvider, RescueProvider>(
+      builder: (context, locationProvider, rescueProvider, child) {
+        return Positioned(
+          right: 16,
+          top: 200,
+          child: SlideTransition(
+            position: _rightPanelAnimation,
+            child: Column(
+              children: [
+                // 缩放按钮
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "zoom_in",
+                  onPressed: () {
+                    // 地图放大
+                    _zoomIn();
+                  },
+                  backgroundColor: Colors.white,
+                  child: const Icon(Icons.zoom_in, color: Colors.black87),
+                ),
+
+                const SizedBox(height: 8),
+
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "zoom_out",
+                  onPressed: () {
+                    // 地图缩小
+                    _zoomOut();
+                  },
+                  backgroundColor: Colors.white,
+                  child: const Icon(Icons.zoom_out, color: Colors.black87),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 定位按钮
+                FloatingActionButton(
+                  mini: true,
+                  heroTag: "my_location",
+                  onPressed: () {
+                    // 定位到当前位置
+                    _moveToCurrentLocation(locationProvider);
+                  },
+                  backgroundColor: Colors.blue,
+                  child: const Icon(Icons.my_location, color: Colors.white),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 8),
-
-            FloatingActionButton(
-              mini: true,
-              heroTag: "zoom_out",
-              onPressed: () {
-                // 地图缩小
-                _zoomOut();
-              },
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.zoom_out, color: Colors.black87),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 定位按钮
-            FloatingActionButton(
-              mini: true,
-              heroTag: "my_location",
-              onPressed: () {
-                // 定位到当前位置
-                _moveToCurrentLocation();
-              },
-              backgroundColor: Colors.blue,
-              child: const Icon(Icons.my_location, color: Colors.white),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -655,25 +666,24 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
 
   /// 地图放大
   void _zoomIn() {
-    // 通过地图组件的key来控制缩放
-    // 这里简化处理，实际应该通过MapController
-    debugPrint('地图放大');
+    final zoom = _mapController.camera.zoom + 1;
+    _mapController.move(_mapController.camera.center, zoom);
   }
 
   /// 地图缩小
   void _zoomOut() {
-    // 通过地图组件的key来控制缩放
-    // 这里简化处理，实际应该通过MapController
-    debugPrint('地图缩小');
+    final zoom = _mapController.camera.zoom - 1;
+    _mapController.move(_mapController.camera.center, zoom);
   }
 
   /// 移动到当前位置
-  void _moveToCurrentLocation() {
-    final locationProvider = context.read<LocationProvider>();
+  void _moveToCurrentLocation(LocationProvider locationProvider) {
     if (locationProvider.currentPosition != null) {
-      // 通过地图组件的key来控制移动
-      // 这里简化处理，实际应该通过MapController
-      debugPrint('移动到当前位置: ${locationProvider.currentPosition}');
+      final location = LatLng(
+        locationProvider.currentPosition!.latitude,
+        locationProvider.currentPosition!.longitude,
+      );
+      _mapController.move(location, _mapController.camera.zoom);
     }
   }
 }

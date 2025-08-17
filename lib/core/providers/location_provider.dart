@@ -229,8 +229,7 @@ class LocationProvider extends ChangeNotifier {
     _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-        timeLimit: Duration(seconds: 10),
+        distanceFilter: 2,
       ),
     ).listen(
       (Position position) {

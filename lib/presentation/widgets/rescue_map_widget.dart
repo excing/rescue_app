@@ -35,6 +35,9 @@ class RescueMapWidget extends StatefulWidget {
   /// 地图点击回调
   final Function(LatLng)? onMapTap;
 
+  /// 地图控制器
+  final MapController? mapController;
+
   const RescueMapWidget({
     super.key,
     this.center,
@@ -45,6 +48,7 @@ class RescueMapWidget extends StatefulWidget {
     this.allUserTracks = const {},
     this.currentUserId,
     this.onMapTap,
+    this.mapController,
   });
 
   @override
@@ -58,13 +62,16 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();
+    _mapController = widget.mapController ?? MapController();
     _currentCenter = widget.center ?? const LatLng(39.9042, 116.4074); // 默认北京
   }
 
   @override
   void dispose() {
-    _mapController.dispose();
+    // 如果控制器是内部创建的，则在此处处理
+    if (widget.mapController == null) {
+      _mapController.dispose();
+    }
     super.dispose();
   }
 
@@ -387,42 +394,5 @@ class _RescueMapWidgetState extends State<RescueMapWidget> {
     return markers;
   }
 
-  /// 移动地图到指定位置
-  void moveToLocation(LatLng location, {double? zoom}) {
-    _mapController.move(location, zoom ?? widget.initialZoom);
-  }
-
-  /// 移动地图到当前位置
-  void moveToCurrentLocation() {
-    final locationProvider = context.read<LocationProvider>();
-    if (locationProvider.currentPosition != null) {
-      moveToLocation(
-        LatLng(
-          locationProvider.currentPosition!.latitude,
-          locationProvider.currentPosition!.longitude,
-        ),
-      );
-    }
-  }
-
-  /// 适配显示所有轨迹点
-  void fitTrackBounds() {
-    if (widget.trackPoints.isEmpty) return;
-
-    final bounds = LatLngBounds.fromPoints(
-      widget.trackPoints
-          .map((point) => LatLng(
-                point.latitude / 10000000.0,
-                point.longitude / 10000000.0,
-              ))
-          .toList(),
-    );
-
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: bounds,
-        padding: const EdgeInsets.all(50),
-      ),
-    );
-  }
+  
 }
