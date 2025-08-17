@@ -24,6 +24,7 @@ class RescuePage extends StatefulWidget {
 class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
+  late AnimationController _syncAnimationController;
   late Animation<double> _fadeAnimation;
 
   // Animations for UI panels
@@ -56,6 +57,11 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
     // Controller for UI panel animations
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    _syncAnimationController = AnimationController(
+      duration: const Duration(seconds: 1),
       vsync: this,
     );
 
@@ -103,6 +109,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _syncAnimationController.dispose();
     super.dispose();
   }
 
@@ -549,12 +556,24 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   Widget _buildSyncButton() {
     return Consumer<SyncProvider>(
       builder: (context, syncProvider, child) {
-        return Positioned(
-          top: 38,
-          right: 16,
+        final isSyncing = syncProvider.isSyncing;
+
+        if (isSyncing) {
+          if (!_syncAnimationController.isAnimating) {
+            _syncAnimationController.repeat();
+          }
+        } else {
+          if (_syncAnimationController.isAnimating) {
+            _syncAnimationController.stop();
+            _syncAnimationController.reset();
+          }
+        }
+
+        return RotationTransition(
+          turns: _syncAnimationController,
           child: IconButton(
-            onPressed: syncProvider.canManualSync ? _performSync : null,
-            icon: Icon(
+            onPressed: isSyncing ? null : _performSync,
+            icon: const Icon(
               Icons.sync,
               color: Colors.white,
             ),

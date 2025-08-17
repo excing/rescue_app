@@ -24,8 +24,10 @@ class SyncProvider extends ChangeNotifier {
   // 同步间隔（分钟）
   static const int _autoSyncIntervalMinutes = 1;
 
+  bool _isSyncing = false;
+
   // Getters
-  bool get isSyncing => _syncService.isSyncing;
+  bool get isSyncing => _isSyncing || _syncService.isSyncing;
   bool get isAutoSyncEnabled => _isAutoSyncEnabled;
   DateTime? get lastSyncTime => _syncService.lastSyncTime;
   String? get syncError => _syncService.lastSyncError;
@@ -68,16 +70,22 @@ class SyncProvider extends ChangeNotifier {
 
   /// 手动同步
   Future<bool> manualSync(String rescueId, String userId) async {
+    if (_isSyncing) return false;
+
+    _isSyncing = true;
+    notifyListeners();
+
     final result = await _syncService.manualSync(rescueId, userId);
+
+    _isSyncing = false;
+
     if (result.isSuccess) {
       // 同步成功后重新加载轨迹数据
       await _loadAllUserTracks(rescueId);
-      notifyListeners();
-      return true;
-    } else {
-      notifyListeners();
-      return false;
     }
+
+    notifyListeners();
+    return result.isSuccess;
   }
 
   /// 加载所有用户轨迹数据
