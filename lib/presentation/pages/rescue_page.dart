@@ -34,7 +34,6 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
   late Animation<Offset> _rightPanelAnimation;
 
   bool _showInfoPanel = true;
-  bool _isTracking = false;
   List<TrackPointModel> _trackPoints = [];
 
   @override
@@ -450,7 +449,7 @@ class _RescuePageState extends State<RescuePage> with TickerProviderStateMixin {
           child: Consumer2<LocationProvider, RescueProvider>(
             builder: (context, locationProvider, rescueProvider, child) {
               return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // 开始/停止记录按钮
                   _buildTrackingButton(locationProvider, rescueProvider),
